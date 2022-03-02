@@ -1,5 +1,6 @@
+from typing import Any
+
 import torch
-from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 from torchtree import TransformedParameter
 from torchtree.core.model import CallableModel
 from torchtree.core.utils import JSONParseError, process_object
@@ -10,6 +11,8 @@ from torchtree.evolution.site_pattern import SitePattern
 from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
+
+from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 
 
 class TreeLikelihoodModel(CallableModel):
@@ -23,7 +26,7 @@ class TreeLikelihoodModel(CallableModel):
         clock_model: BranchModel = None,
         use_ambiguities=False,
     ):
-        super(TreeLikelihoodModel, self).__init__(id_)
+        super().__init__(id_)
         self.tree_model = tree_model
         self.subst_model = subst_model
         self.site_model = site_model
@@ -158,7 +161,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             if branch_lengths.requires_grad:
                 grads.append(torch.tensor(inst.gradient()))
         ctx.grads = torch.stack(grads) if branch_lengths.requires_grad else None
-        return torch.stack(log_probs)  # .view(branch_lengths[:-1])
+        return torch.stack(log_probs)
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -175,22 +178,6 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             ..., : branch_lengths.shape[-1]
         ] * grad_output.unsqueeze(-1)
         offset = branch_lengths.shape[-1]
-
-        if weibull_shape is not None:
-            weibull_grad = ctx.grads[
-                ..., offset : (offset + weibull_shape.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += weibull_shape.shape[-1]
-        else:
-            weibull_grad = None
-
-        if mu is not None:
-            mu_grad = ctx.grads[
-                ..., offset : (offset + mu.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += mu.shape[-1]
-        else:
-            mu_grad = None
 
         if clock_rates is not None:
             clock_rate_grad = ctx.grads[
@@ -215,6 +202,22 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             offset += subst_frequencies.shape[-1]
         else:
             subst_frequencies_grad = None
+
+        if weibull_shape is not None:
+            weibull_grad = ctx.grads[
+                ..., offset : (offset + weibull_shape.shape[-1])
+            ] * grad_output.unsqueeze(-1)
+            offset += weibull_shape.shape[-1]
+        else:
+            weibull_grad = None
+
+        if mu is not None:
+            mu_grad = ctx.grads[
+                ..., offset : (offset + mu.shape[-1])
+            ] * grad_output.unsqueeze(-1)
+            offset += mu.shape[-1]
+        else:
+            mu_grad = None
 
         return (
             None,  # inst

@@ -1,7 +1,7 @@
 import abc
 
 
-class Interface(object):
+class Interface:
     @abc.abstractmethod
     def update(self, index):
         ...

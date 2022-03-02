@@ -15,22 +15,22 @@ extern "C" {
 #include "phyc/treetransform.h"
 }
 
+using double_np =
+    py::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>;
+
 class Interface {
  public:
-  virtual void SetParameters(const std::vector<double> &parameters) = 0;
-  virtual std::vector<double> GetParameters() = 0;
+  virtual void SetParameters(double_np parameters) = 0;
+  virtual double_np GetParameters() = 0;
 
   Model *model_;
 };
 
 class TreeModelInterface : public Interface {
  public:
-  TreeModelInterface(const std::string &newick,
-                     const std::vector<std::string> &taxa,
-                     std::optional<std::vector<double>> dates) {
-    model_ = new_TreeModel_from_newick(
-        newick.c_str(), dates.has_value() ? dates->data() : NULL);
-    transformModel_ = reinterpret_cast<Model *>(model_->data);
+  virtual ~TreeModelInterface() {}
+
+  void Initialize(const std::vector<std::string> &taxa) {
     treeModel_ = reinterpret_cast<Tree *>(model_->obj);
     nodeCount_ = Tree_node_count(treeModel_);
     tipCount_ = Tree_tip_count(treeModel_);
@@ -52,39 +52,85 @@ class TreeModelInterface : public Interface {
     }
   }
 
-  virtual ~TreeModelInterface() {}
-
-  void SetParameters(const std::vector<double> &parameters) override {
-    if (transformModel_ != NULL) {
-      TreeTransform *tt =
-          reinterpret_cast<TreeTransform *>(transformModel_->obj);
-      Parameters *p = tt->parameters;
-      for (size_t i = 0; i < Parameters_count(p); i++) {
-        Parameters_set_value(p, i, parameters[i]);
-      }
-    } else {
-      Node **nodes = Tree_nodes(treeModel_);
-      Node *root = Tree_root(treeModel_);
-      for (size_t i = 0; i < nodeCount_; i++) {
-        Node *node = nodes[i];
-        if (node != root && root->right != node) {
-          Node_set_distance(node, parameters[nodeMap_[node->id]]);
-        }
-      }
-    }
-  }
-
-  std::vector<double> GetParameters() override {
-    std::vector<double> values;
-    return values;
-  }
-
   size_t nodeCount_;
   size_t tipCount_;
   std::vector<size_t> nodeMap_;
   Tree *treeModel_;
+};
 
- private:
+class UnRootedTreeModelInterface : public TreeModelInterface {
+ public:
+  UnRootedTreeModelInterface(const std::string &newick,
+                             const std::vector<std::string> &taxa) {
+    model_ = new_TreeModel_from_newick(newick.c_str(), NULL);
+    Initialize(taxa);
+  }
+
+  virtual ~UnRootedTreeModelInterface() {}
+
+  void SetParameters(double_np parameters) override {
+    auto data = parameters.data();
+    Node **nodes = Tree_nodes(treeModel_);
+    Node *root = Tree_root(treeModel_);
+    for (size_t i = 0; i < nodeCount_; i++) {
+      Node *node = nodes[i];
+      if (node != root && root->right != node) {
+        Node_set_distance(node, data[nodeMap_[node->id]]);
+      }
+    }
+  }
+  double_np GetParameters() override { return {}; }
+};
+
+class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
+ public:
+  ReparameterizedTimeTreeModelInterface(const std::string &newick,
+                                        const std::vector<std::string> &taxa,
+                                        const std::vector<double> dates) {
+    model_ = new_TreeModel_from_newick(newick.c_str(), dates.data());
+    transformModel_ = reinterpret_cast<Model *>(model_->data);
+    Initialize(taxa);
+  }
+
+  virtual ~ReparameterizedTimeTreeModelInterface() {}
+
+  void SetParameters(double_np parameters) override {
+    auto data = parameters.data();
+    TreeTransform *tt = reinterpret_cast<TreeTransform *>(transformModel_->obj);
+    Parameters *p = tt->parameters;
+    Node **nodes = Tree_nodes(treeModel_);
+    for (size_t i = 0; i < nodeCount_; i++) {
+      if (!Node_isleaf(nodes[i])) {
+        // This loop is ineficient: tt->map[nodes[i]->id] == nodes[i]->class_id
+        Parameters_set_value(p, tt->map[nodes[i]->id],
+                             data[nodes[i]->class_id]);
+      }
+    }
+  }
+
+  double_np GetParameters() override { return {}; }
+
+  double_np GetNodeHeights() {
+    double_np heights(tipCount_ - 1);
+    auto data = heights.mutable_data();
+    Tree_update_heights(treeModel_);
+    Node **nodes = Tree_nodes(treeModel_);
+    for (size_t i = 0; i < nodeCount_; i++) {
+      if (!Node_isleaf(nodes[i])) {
+        data[nodes[i]->class_id] = Node_height(nodes[i]);
+      }
+    }
+    return heights;
+  }
+  double_np GradientTransformJVP(double_np height_gradient) {
+    double_np gradient(tipCount_ - 1);
+    auto height_gradient_data = height_gradient.data();
+    auto gradient_data = gradient.mutable_data();
+    Tree_node_transform_jvp(treeModel_, height_gradient_data, gradient_data);
+    return gradient;
+  }
+
+ protected:
   Model *transformModel_;
 };
 
@@ -92,17 +138,19 @@ class BranchModelInterface : public Interface {
  public:
   virtual ~BranchModelInterface() {}
 
-  void SetParameters(const std::vector<double> &parameters) override {
-    for (size_t i = 0; i < parameters.size(); i++) {
-      Parameters_set_value(branchModel_->rates, i, parameters[i]);
-    }
+  void SetParameters(double_np parameters) override {
+    Parameters_set_values(branchModel_->rates, parameters.data());
   }
-  std::vector<double> GetParameters() override {
-    std::vector<double> values(Parameters_count(branchModel_->rates));
+  double_np GetParameters() override {
+    double_np values = double_np(Parameters_count(branchModel_->rates));
+    auto data = values.mutable_data();
     for (size_t i = 0; i < Parameters_count(branchModel_->rates); i++) {
-      values[i] = Parameters_value(branchModel_->rates, i);
+      data[i] = Parameters_value(branchModel_->rates, i);
     }
     return values;
+  }
+  void SetRates(double_np rates) {
+    Parameters_set_values(branchModel_->rates, rates.data());
   }
 
  protected:
@@ -111,7 +159,7 @@ class BranchModelInterface : public Interface {
 
 class StrictClockModelInterface : public BranchModelInterface {
  public:
-  StrictClockModelInterface(double rate, TreeModelInterface &treeModel) {
+  StrictClockModelInterface(double rate, const TreeModelInterface &treeModel) {
     Parameter *p = new_Parameter("", rate, NULL);
     p->model = MODEL_BRANCHMODEL;
     branchModel_ = new_StrictClock_with_parameter(treeModel.treeModel_, p);
@@ -119,6 +167,10 @@ class StrictClockModelInterface : public BranchModelInterface {
     model_ = new_BranchModel2("", branchModel_, treeModel.model_, NULL);
   }
   virtual ~StrictClockModelInterface() {}
+
+  void SetRate(double rate) {
+    Parameters_set_value(branchModel_->rates, 0, rate);
+  }
 };
 
 class SubstitutionModelInterface : public Interface {
@@ -126,7 +178,7 @@ class SubstitutionModelInterface : public Interface {
   virtual ~SubstitutionModelInterface() {}
 
  protected:
-  Model *initialize(const std::string &name, Parameters *rates,
+  Model *Initialize(const std::string &name, Parameters *rates,
                     Model *frequencies) {
     DataType *datatype = new_NucleotideDataType();
     substModel_ = SubstitutionModel_factory(
@@ -145,14 +197,14 @@ class JC69Interface : public SubstitutionModelInterface {
   JC69Interface() {
     Simplex *frequencies_simplex = new_Simplex("", 4);
     Model *frequencies_model = new_SimplexModel("", frequencies_simplex);
-    model_ = initialize("JC69", NULL, frequencies_model);
+    model_ = Initialize("JC69", NULL, frequencies_model);
     frequencies_model->free(frequencies_model);
   }
 
   virtual ~JC69Interface() {}
 
-  void SetParameters(const std::vector<double> &parameters) override {}
-  std::vector<double> GetParameters() override { return {}; }
+  void SetParameters(double_np parameters) override {}
+  double_np GetParameters() override { return {}; }
 };
 
 class HKYInterface : public SubstitutionModelInterface {
@@ -163,7 +215,7 @@ class HKYInterface : public SubstitutionModelInterface {
     Simplex *frequencies_simplex =
         new_Simplex_with_values("", frequencies.data(), frequencies.size());
     Model *frequencies_model = new_SimplexModel("id", frequencies_simplex);
-    model_ = initialize("hky", kappa_parameters, frequencies_model);
+    model_ = Initialize("hky", kappa_parameters, frequencies_model);
     free_Parameters(kappa_parameters);
     frequencies_model->free(frequencies_model);
   }
@@ -171,14 +223,15 @@ class HKYInterface : public SubstitutionModelInterface {
   void SetKappa(double kappa) {
     Parameters_set_value(substModel_->rates, 0, kappa);
   }
-  void SetFrequencies(std::vector<double> frequencies) {
+  void SetFrequencies(double_np frequencies) {
     substModel_->simplex->set_values(substModel_->simplex, frequencies.data());
   }
-  void SetParameters(const std::vector<double> &parameters) override {}
-  std::vector<double> GetParameters() override {
-    std::vector<double> values;
-    return values;
+  void SetParameters(double_np parameters) override {
+    auto data = parameters.data();
+    SetKappa(data[1]);
+    substModel_->simplex->set_values(substModel_->simplex, data + 1);
   }
+  double_np GetParameters() override { return {}; }
 };
 
 class GTRInterface : public SubstitutionModelInterface {
@@ -199,25 +252,29 @@ class GTRInterface : public SubstitutionModelInterface {
     Simplex *frequencies_simplex =
         new_Simplex_with_values("", frequencies.data(), frequencies.size());
     Model *frequencies_model = new_SimplexModel("id", frequencies_simplex);
-    model_ = initialize("gtr", rates_parameters, frequencies_model);
+    model_ = Initialize("gtr", rates_parameters, frequencies_model);
     free_Parameters(rates_parameters);
     frequencies_model->free(frequencies_model);
   }
   virtual ~GTRInterface() {}
-  void SetRates(const std::vector<double> &rates) {
-    //    Parameters_set_value(substModel_->rates, 0, kappa);
+  void SetRates(double_np rates) {
+    Parameters_set_values(substModel_->rates, rates.data());
   }
-  void SetFrequencies(std::vector<double> frequencies) {
+  void SetFrequencies(double_np frequencies) {
     substModel_->simplex->set_values(substModel_->simplex, frequencies.data());
   }
-  void SetParameters(const std::vector<double> &parameters) override {}
-  std::vector<double> GetParameters() override {
-    std::vector<double> values;
-    return values;
+  void SetParameters(double_np parameters) override {
+    auto data = parameters.data();
+    Parameters_set_values(substModel_->rates, data);
+    substModel_->simplex->set_values(substModel_->simplex, data + 3);
   }
+  double_np GetParameters() override { return {}; }
 };
 
 class SiteModelInterface : public Interface {
+ public:
+  virtual ~SiteModelInterface() {}
+
  protected:
   SiteModel *siteModel_;
 };
@@ -238,15 +295,17 @@ class ConstantSiteModelInterface : public SiteModelInterface {
     // siteModel_->free(siteModel_);
   }
   void SetMu(double mu) { Parameter_set_value(siteModel_->mu, mu); }
-  void SetParameters(const std::vector<double> &parameters) override {
+  void SetParameters(double_np parameters) override {
+    auto data = parameters.data();
     if (siteModel_->mu != NULL) {
-      Parameter_set_value(siteModel_->mu, parameters[0]);
+      Parameter_set_value(siteModel_->mu, data[0]);
     }
   }
-  std::vector<double> GetParameters() override {
-    std::vector<double> values;
+  double_np GetParameters() override {
+    double_np values = double_np(1);
+    auto data = values.mutable_data();
     if (siteModel_->mu != NULL) {
-      values.push_back(Parameter_value(siteModel_->mu));
+      data[0] = Parameter_value(siteModel_->mu);
     }
     return values;
   }
@@ -270,34 +329,36 @@ class WeibullSiteModelInterface : public SiteModelInterface {
     free_Parameters(params);
   }
 
-  virtual ~WeibullSiteModelInterface() {
-    // siteModel_->free(siteModel_);
-  }
+  virtual ~WeibullSiteModelInterface() {}
 
   void SetShape(double shape) {
     Parameters_set_value(siteModel_->rates, 0, shape);
   }
   void SetMu(double mu) { Parameter_set_value(siteModel_->mu, mu); }
-  void SetParameters(const std::vector<double> &parameters) override {
+  void SetParameters(double_np parameters) override {
     size_t shift = 0;
+    auto data = parameters.data();
     if (Parameters_count(siteModel_->rates) > 0) {
-      Parameters_set_value(siteModel_->rates, 0, parameters[0]);
+      Parameters_set_value(siteModel_->rates, 0, data[0]);
       shift++;
     }
     if (siteModel_->mu != NULL) {
-      Parameter_set_value(siteModel_->mu, parameters[shift]);
+      Parameter_set_value(siteModel_->mu, data[shift]);
       shift++;
     }
   }
-  std::vector<double> GetParameters() override {
-    std::vector<double> values;
+  double_np GetParameters() override {
+    size_t param_count =
+        Parameters_count(siteModel_->rates) + siteModel_->mu != NULL;
+    double_np values = double_np(param_count);
+    auto data = values.mutable_data();
     size_t shift = 0;
     if (Parameters_count(siteModel_->rates) > 0) {
-      values.push_back(Parameters_value(siteModel_->rates, 0));
+      data[0] = Parameters_value(siteModel_->rates, 0);
       shift++;
     }
     if (siteModel_->mu != NULL) {
-      values.push_back(Parameter_value(siteModel_->mu));
+      data[shift] = Parameter_value(siteModel_->mu);
       shift++;
     }
     return values;
@@ -337,30 +398,31 @@ class TreeLikelihoodInterface {
     model_ = new_TreeLikelihoodModel("id", tlk, treeModel_->model_,
                                      substitutionModel_->model_,
                                      siteModel_->model_, mbm);
-    RequestGradient(0);
+    RequestGradient();
   }
 
   double LogLikelihood() { return model_->logP(model_); }
 
-  void RequestGradient(int flags) {
+  void RequestGradient(int flags = 0) {
     gradient_length_ = TreeLikelihood_initialize_gradient(model_, flags);
   }
 
-  std::vector<double> Gradient() {
+  double_np Gradient() {
     double *gradient = TreeLikelihood_gradient(model_);
-    std::vector<double> values(
+    double_np values(
         (branchModel_ == NULL ? gradient_length_ - 2 : gradient_length_));
+    auto data = values.mutable_data();
     size_t i = 0;
     size_t j = 0;
     if (branchModel_ == NULL) {
       for (; i < treeModel_->nodeCount_ - 2; i++) {
-        values[treeModel_->nodeMap_[i]] = gradient[i];
+        data[treeModel_->nodeMap_[i]] = gradient[i];
       }
       i += 2;
       j = treeModel_->nodeCount_ - 2;
     }
     for (; i < gradient_length_; i++, j++) {
-      values[j] = gradient[i];
+      data[j] = gradient[i];
     }
     return values;
   }
@@ -385,11 +447,24 @@ PYBIND11_MODULE(physher, m) {
       .def("gradient", &TreeLikelihoodInterface::Gradient)
       .def("request_gradient", &TreeLikelihoodInterface::RequestGradient);
 
-  py::class_<TreeModelInterface>(m, "TreeModel")
+  py::class_<TreeModelInterface>(m, "TreeModelInterface");
+  py::class_<UnRootedTreeModelInterface, TreeModelInterface>(
+      m, "UnRootedTreeModel")
+      .def(py::init<const std::string &, const std::vector<std::string> &>())
+      .def("set_parameters", &UnRootedTreeModelInterface::SetParameters)
+      .def("parameters", &UnRootedTreeModelInterface::GetParameters);
+
+  py::class_<ReparameterizedTimeTreeModelInterface, TreeModelInterface>(
+      m, "ReparameterizedTimeTreeModel")
       .def(py::init<const std::string &, const std::vector<std::string> &,
-                    std::optional<std::vector<double>>>())
-      .def("set_parameters", &TreeModelInterface::SetParameters)
-      .def("parameters", &TreeModelInterface::GetParameters);
+                    const std::vector<double> &>())
+      .def("set_parameters",
+           &ReparameterizedTimeTreeModelInterface::SetParameters)
+      .def("parameters", &ReparameterizedTimeTreeModelInterface::GetParameters)
+      .def("get_node_heights",
+           &ReparameterizedTimeTreeModelInterface::GetNodeHeights)
+      .def("gradient_transform_jvp",
+           &ReparameterizedTimeTreeModelInterface::GradientTransformJVP);
 
   py::class_<SubstitutionModelInterface>(m, "SubstitutionModelInterface");
 
@@ -433,5 +508,6 @@ PYBIND11_MODULE(physher, m) {
       m, "StrictClockModel")
       .def(py::init<double, TreeModelInterface &>())
       .def("set_parameters", &StrictClockModelInterface::SetParameters)
-      .def("parameters", &StrictClockModelInterface::GetParameters);
+      .def("parameters", &StrictClockModelInterface::GetParameters)
+      .def("set_rate", &StrictClockModelInterface::SetRate);
 }
