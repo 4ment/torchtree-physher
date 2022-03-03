@@ -118,17 +118,10 @@ class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
         super().__init__(id_, tree, taxa, ratios_root_heights)
         taxon_list = [taxon.id for taxon in taxa]
 
-        # physher needs dates in the right order
-        l = []
-        for node in tree.postorder_node_iter():
-            if node.is_leaf():
-                l.append(node.taxon.label)
-        dates = [self.sampling_times.tolist()[taxon_list.index(taxon)] for taxon in l]
-
         self.inst = PhysherReparameterizedTimeTreeModel(
             tree.as_string('newick').replace("'", "").replace('[&R] ', ''),
             taxon_list,
-            dates,
+            self.sampling_times.tolist(),
         )
         self.inst.set_parameters(ratios_root_heights.tensor.tolist())
 

@@ -28,12 +28,26 @@ class Interface {
 
 class TreeModelInterface : public Interface {
  public:
-  virtual ~TreeModelInterface() {}
+  TreeModelInterface(const std::string &newick,
+                     const std::vector<std::string> &taxa,
+                     std::optional<const std::vector<double>> dates) {
+    char **taxa_p = new char *[taxa.size()];
+    for (size_t i = 0; i < taxa.size(); i++) {
+      taxa_p[i] = const_cast<char *>(taxa[i].c_str());
+    }
+    model_ = new_TreeModel_from_newick(
+        newick.c_str(), taxa_p, dates.has_value() ? dates->data() : NULL);
+    delete[] taxa_p;
 
-  void Initialize(const std::vector<std::string> &taxa) {
     treeModel_ = reinterpret_cast<Tree *>(model_->obj);
     nodeCount_ = Tree_node_count(treeModel_);
     tipCount_ = Tree_tip_count(treeModel_);
+
+    InitializeMap(taxa);
+  }
+  virtual ~TreeModelInterface() {}
+
+  void InitializeMap(const std::vector<std::string> &taxa) {
     nodeMap_.resize(nodeCount_);
     for (size_t i = 0; i < nodeCount_; i++) {
       Node *node = Tree_node(treeModel_, i);
@@ -61,10 +75,8 @@ class TreeModelInterface : public Interface {
 class UnRootedTreeModelInterface : public TreeModelInterface {
  public:
   UnRootedTreeModelInterface(const std::string &newick,
-                             const std::vector<std::string> &taxa) {
-    model_ = new_TreeModel_from_newick(newick.c_str(), NULL);
-    Initialize(taxa);
-  }
+                             const std::vector<std::string> &taxa)
+      : TreeModelInterface(newick, taxa, std::nullopt) {}
 
   virtual ~UnRootedTreeModelInterface() {}
 
@@ -86,10 +98,9 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
  public:
   ReparameterizedTimeTreeModelInterface(const std::string &newick,
                                         const std::vector<std::string> &taxa,
-                                        const std::vector<double> dates) {
-    model_ = new_TreeModel_from_newick(newick.c_str(), dates.data());
+                                        const std::vector<double> dates)
+      : TreeModelInterface(newick, taxa, dates) {
     transformModel_ = reinterpret_cast<Model *>(model_->data);
-    Initialize(taxa);
   }
 
   virtual ~ReparameterizedTimeTreeModelInterface() {}
@@ -97,15 +108,7 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
   void SetParameters(double_np parameters) override {
     auto data = parameters.data();
     TreeTransform *tt = reinterpret_cast<TreeTransform *>(transformModel_->obj);
-    Parameters *p = tt->parameters;
-    Node **nodes = Tree_nodes(treeModel_);
-    for (size_t i = 0; i < nodeCount_; i++) {
-      if (!Node_isleaf(nodes[i])) {
-        // This loop is ineficient: tt->map[nodes[i]->id] == nodes[i]->class_id
-        Parameters_set_value(p, tt->map[nodes[i]->id],
-                             data[nodes[i]->class_id]);
-      }
-    }
+    Parameters_set_values(tt->parameters, data);
   }
 
   double_np GetParameters() override { return {}; }
@@ -457,7 +460,7 @@ PYBIND11_MODULE(physher, m) {
   py::class_<ReparameterizedTimeTreeModelInterface, TreeModelInterface>(
       m, "ReparameterizedTimeTreeModel")
       .def(py::init<const std::string &, const std::vector<std::string> &,
-                    const std::vector<double> &>())
+                    const std::vector<double>>())
       .def("set_parameters",
            &ReparameterizedTimeTreeModelInterface::SetParameters)
       .def("parameters", &ReparameterizedTimeTreeModelInterface::GetParameters)
