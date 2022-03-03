@@ -47,7 +47,7 @@ class GeneralNodeHeightTransform(Transform):
     Transform from ratios to node heights.
     """
 
-    def __init__(self, tree, inst, cache_size=0):
+    def __init__(self, inst, cache_size=0):
         super().__init__(cache_size=cache_size)
         self.inst = inst
 
@@ -59,7 +59,8 @@ class GeneralNodeHeightTransform(Transform):
         raise NotImplementedError
 
     def log_abs_det_jacobian(self, x, y):
-        return torch.zeros(1)
+        fn = NodeHeightJacobianAutogradFunction.apply
+        return fn(self.inst, x)
 
 
 class NodeHeightAutogradFunction(torch.autograd.Function):
@@ -97,6 +98,31 @@ class NodeHeightAutogradFunction(torch.autograd.Function):
         return None, grad
 
 
+class NodeHeightJacobianAutogradFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, inst, ratios_root_height):
+        ctx.inst = inst
+        ctx.save_for_backward(ratios_root_height)
+
+        log_probs = []
+        grads = []
+
+        tensor_flatten = flatten_2D(ratios_root_height)
+        params_numpy = tensor_flatten.detach().numpy()
+        for batch_idx in range(tensor_flatten.shape[0]):
+            inst.set_parameters(params_numpy[batch_idx, ...])
+            log_probs.append(torch.tensor([inst.transform_jacobian()]))
+            if ratios_root_height.requires_grad:
+                grads.append(torch.tensor(inst.gradient_transform_jacobian()))
+
+        ctx.grads = torch.stack(grads) if ratios_root_height.requires_grad else None
+        return torch.stack(log_probs)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return None, ctx.grads * grad_output
+
+
 class UnRootedTreeModel(TUnRootedTreeModel, Interface):
     def __init__(
         self, id_: ID, tree, taxa: Taxa, branch_lengths: AbstractParameter
@@ -128,10 +154,17 @@ class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
     def update(self, index):
         self.inst.set_parameters(self._internal_heights.tensor[index].detach().numpy())
 
+    def _call(self, *args, **kwargs) -> torch.Tensor:
+        if self.heights_need_update:
+            self.update_node_heights()
+        return GeneralNodeHeightTransform(self.inst).log_abs_det_jacobian(
+            self._internal_heights.tensor, self._heights
+        )
+
     @property
     def node_heights(self) -> torch.Tensor:
         if self.heights_need_update:
-            self._heights = GeneralNodeHeightTransform(self, self.inst)(
+            self._heights = GeneralNodeHeightTransform(self.inst)(
                 self._internal_heights.tensor
             )
             self._node_heights = torch.cat(

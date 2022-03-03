@@ -133,6 +133,18 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
     return gradient;
   }
 
+  double_np GradientTransformJacobian() {
+    double_np gradient(tipCount_ - 1);
+    auto gradient_data = gradient.mutable_data();
+    Tree_node_transform_jacobian_gradient(treeModel_, gradient_data);
+    return gradient;
+  }
+
+  double TransformJacobian() {
+    TreeTransform *tt = reinterpret_cast<TreeTransform *>(transformModel_->obj);
+    return tt->log_jacobian(tt);
+  }
+
  protected:
   Model *transformModel_;
 };
@@ -407,13 +419,13 @@ class TreeLikelihoodInterface {
   double LogLikelihood() { return model_->logP(model_); }
 
   void RequestGradient(int flags = 0) {
-    gradient_length_ = TreeLikelihood_initialize_gradient(model_, flags);
+    gradientLength_ = TreeLikelihood_initialize_gradient(model_, flags);
   }
 
   double_np Gradient() {
     double *gradient = TreeLikelihood_gradient(model_);
     double_np values(
-        (branchModel_ == NULL ? gradient_length_ - 2 : gradient_length_));
+        (branchModel_ == NULL ? gradientLength_ - 2 : gradientLength_));
     auto data = values.mutable_data();
     size_t i = 0;
     size_t j = 0;
@@ -424,7 +436,7 @@ class TreeLikelihoodInterface {
       i += 2;
       j = treeModel_->nodeCount_ - 2;
     }
-    for (; i < gradient_length_; i++, j++) {
+    for (; i < gradientLength_; i++, j++) {
       data[j] = gradient[i];
     }
     return values;
@@ -434,7 +446,7 @@ class TreeLikelihoodInterface {
   SiteModelInterface *siteModel_;
   BranchModelInterface *branchModel_;
   SitePattern *sitePattern_;
-  size_t gradient_length_;
+  size_t gradientLength_;
 
  private:
   Model *model_;
@@ -467,7 +479,11 @@ PYBIND11_MODULE(physher, m) {
       .def("get_node_heights",
            &ReparameterizedTimeTreeModelInterface::GetNodeHeights)
       .def("gradient_transform_jvp",
-           &ReparameterizedTimeTreeModelInterface::GradientTransformJVP);
+           &ReparameterizedTimeTreeModelInterface::GradientTransformJVP)
+      .def("gradient_transform_jacobian",
+           &ReparameterizedTimeTreeModelInterface::GradientTransformJacobian)
+      .def("transform_jacobian",
+           &ReparameterizedTimeTreeModelInterface::TransformJacobian);
 
   py::class_<SubstitutionModelInterface>(m, "SubstitutionModelInterface");
 
