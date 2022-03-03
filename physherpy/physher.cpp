@@ -8,6 +8,7 @@
 namespace py = pybind11;
 
 extern "C" {
+#include "phyc/demographicmodels.h"
 #include "phyc/parameters.h"
 #include "phyc/sequence.h"
 #include "phyc/simplex.h"
@@ -300,8 +301,9 @@ class ConstantSiteModelInterface : public SiteModelInterface {
     siteModel_ = new_SiteModel_with_parameters(
         NULL, NULL, 1, DISTRIBUTION_UNIFORM, false, QUADRATURE_QUANTILE_MEDIAN);
     if (mu.has_value()) {
-      siteModel_->mu = new_Parameter("mu", *mu, NULL);
-      siteModel_->mu->model = MODEL_SITEMODEL;
+      Parameter *mu_param = new_Parameter("mu", *mu, NULL);
+      SiteModel_set_mu(siteModel_, mu_param);
+      free_Parameter(mu_param);
     }
     model_ = new_SiteModel2("sitemodel", siteModel_, NULL);
   }
@@ -337,8 +339,9 @@ class WeibullSiteModelInterface : public SiteModelInterface {
                                                DISTRIBUTION_WEIBULL, false,
                                                QUADRATURE_QUANTILE_MEDIAN);
     if (mu.has_value()) {
-      siteModel_->mu = new_Parameter("mu", *mu, NULL);
-      siteModel_->mu->model = MODEL_SITEMODEL;
+      Parameter *mu_param = new_Parameter("mu", *mu, NULL);
+      SiteModel_set_mu(siteModel_, mu_param);
+      free_Parameter(mu_param);
     }
     model_ = new_SiteModel2("sitemodel", siteModel_, NULL);
     free_Parameters(params);
@@ -452,6 +455,63 @@ class TreeLikelihoodInterface {
   Model *model_;
 };
 
+class CoalescentModelInterface : public Interface {
+ protected:
+  explicit CoalescentModelInterface(const TreeModelInterface &treeModel)
+      : treeModel_(treeModel) {}
+
+ public:
+  virtual ~CoalescentModelInterface() {}
+
+  double LogLikelihood() { return model_->logP(model_); }
+
+  void RequestGradient(int flags = 0) {
+    gradientLength_ = Coalescent_initialize_gradient(model_, flags);
+  }
+
+  double_np Gradient() {
+    double *gradient = Coalescent_gradient(model_);
+    double_np values(gradientLength_);
+    auto data = values.mutable_data();
+    for (size_t i = 0; i < gradientLength_; i++) {
+      data[i] = gradient[i];
+    }
+    return values;
+  }
+
+  void SetParameters(double_np parameters) override {
+    Parameters_set_values(coalescent_->p, parameters.data());
+  }
+  double_np GetParameters() override {
+    double_np values = double_np(1);
+    auto data = values.mutable_data();
+    //
+    return values;
+  }
+
+ protected:
+  Coalescent *coalescent_;
+
+ private:
+  const TreeModelInterface &treeModel_;
+  size_t gradientLength_;
+};
+
+class ConstantCoalescentModelInterface : public CoalescentModelInterface {
+ public:
+  ConstantCoalescentModelInterface(double theta,
+                                   const TreeModelInterface &treeModel)
+      : CoalescentModelInterface(treeModel) {
+    Parameter *theta_param = new_Parameter("", theta, NULL);
+    coalescent_ = new_ConstantCoalescent(
+        reinterpret_cast<Tree *>(treeModel.model_->obj), theta_param);
+    free_Parameter(theta_param);
+    model_ = new_CoalescentModel2("id", coalescent_, treeModel.model_, NULL);
+    RequestGradient();
+  }
+  virtual ~ConstantCoalescentModelInterface() {}
+};
+
 PYBIND11_MODULE(physher, m) {
   py::class_<TreeLikelihoodInterface>(m, "TreeLikelihoodModel")
       .def(py::init<const std::vector<std::pair<std::string, std::string>> &,
@@ -529,4 +589,15 @@ PYBIND11_MODULE(physher, m) {
       .def("set_parameters", &StrictClockModelInterface::SetParameters)
       .def("parameters", &StrictClockModelInterface::GetParameters)
       .def("set_rate", &StrictClockModelInterface::SetRate);
+
+  py::class_<CoalescentModelInterface>(m, "CoalescentModelInterface")
+      .def("log_likelihood", &CoalescentModelInterface::LogLikelihood)
+      .def("gradient", &CoalescentModelInterface::Gradient)
+      .def("request_gradient", &CoalescentModelInterface::RequestGradient)
+      .def("set_parameters", &CoalescentModelInterface::SetParameters)
+      .def("parameters", &CoalescentModelInterface::GetParameters);
+
+  py::class_<ConstantCoalescentModelInterface, CoalescentModelInterface>(
+      m, "ConstantCoalescentModel")
+      .def(py::init<double, const TreeModelInterface &>());
 }
