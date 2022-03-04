@@ -512,6 +512,46 @@ class ConstantCoalescentModelInterface : public CoalescentModelInterface {
   virtual ~ConstantCoalescentModelInterface() {}
 };
 
+class PiecewiseConstantCoalescentInterface : public CoalescentModelInterface {
+ public:
+  PiecewiseConstantCoalescentInterface(const std::vector<double> &thetas,
+                                       const TreeModelInterface &treeModel)
+      : CoalescentModelInterface(treeModel) {
+    Parameters *thetas_param = new_Parameters(thetas.size());
+    for (size_t i = 0; i < thetas.size(); i++) {
+      Parameters_move(thetas_param, new_Parameter("", thetas[i], NULL));
+    }
+    coalescent_ =
+        new_SkyrideCoalescent(reinterpret_cast<Tree *>(treeModel.model_->obj),
+                              thetas_param, COALESCENT_THETA);
+    free_Parameters(thetas_param);
+    model_ = new_CoalescentModel2("id", coalescent_, treeModel.model_, NULL);
+    RequestGradient();
+  }
+  virtual ~PiecewiseConstantCoalescentInterface() {}
+};
+
+class PiecewiseConstantCoalescentGridInterface
+    : public CoalescentModelInterface {
+ public:
+  PiecewiseConstantCoalescentGridInterface(const std::vector<double> &thetas,
+                                           const TreeModelInterface &treeModel,
+                                           double cutoff)
+      : CoalescentModelInterface(treeModel) {
+    Parameters *thetas_param = new_Parameters(thetas.size());
+    for (size_t i = 0; i < thetas.size(); i++) {
+      Parameters_move(thetas_param, new_Parameter("", thetas[i], NULL));
+    }
+    coalescent_ = new_GridCoalescent(
+        reinterpret_cast<Tree *>(treeModel.model_->obj), thetas_param,
+        thetas.size(), cutoff, COALESCENT_THETA);
+    free_Parameters(thetas_param);
+    model_ = new_CoalescentModel2("id", coalescent_, treeModel.model_, NULL);
+    RequestGradient();
+  }
+  virtual ~PiecewiseConstantCoalescentGridInterface() {}
+};
+
 PYBIND11_MODULE(physher, m) {
   py::class_<TreeLikelihoodInterface>(m, "TreeLikelihoodModel")
       .def(py::init<const std::vector<std::pair<std::string, std::string>> &,
@@ -600,4 +640,14 @@ PYBIND11_MODULE(physher, m) {
   py::class_<ConstantCoalescentModelInterface, CoalescentModelInterface>(
       m, "ConstantCoalescentModel")
       .def(py::init<double, const TreeModelInterface &>());
+
+  py::class_<PiecewiseConstantCoalescentInterface, CoalescentModelInterface>(
+      m, "PiecewiseConstantCoalescentModel")
+      .def(py::init<const std::vector<double>, const TreeModelInterface &>());
+
+  py::class_<PiecewiseConstantCoalescentGridInterface,
+             CoalescentModelInterface>(m,
+                                       "PiecewiseConstantCoalescentGridModel")
+      .def(py::init<const std::vector<double>, const TreeModelInterface &,
+                    double>());
 }
