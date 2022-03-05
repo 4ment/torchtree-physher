@@ -1,11 +1,10 @@
+from physherpy.interface import Interface
+from physherpy.physher import HKY as PhysherHKY
+from physherpy.physher import JC69 as PhysherJC69
 from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.evolution.substitution_model.nucleotide import HKY as THKY
 from torchtree.evolution.substitution_model.nucleotide import JC69 as TJC69
 from torchtree.typing import ID
-
-from physherpy.interface import Interface
-from physherpy.physher import HKY as PhysherHKY
-from physherpy.physher import JC69 as PhysherJC69
 
 
 class JC69(TJC69, Interface):

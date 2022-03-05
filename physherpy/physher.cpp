@@ -19,6 +19,19 @@ extern "C" {
 using double_np =
     py::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>;
 
+enum class CoalescentGradientFlags {
+  TREE_RATIO = COALESCENT_FLAG_TREE,
+  TREE_HEIGHT = COALESCENT_FLAG_TREE_HEIGHT,
+  THETA = COALESCENT_FLAG_THETA
+};
+
+enum class TreeLikelihoodGradientFlags {
+  TREE_HEIGHT = TREELIKELIHOOD_FLAG_TREE,
+  SITE_MODEL = TREELIKELIHOOD_FLAG_SITE_MODEL,
+  SUBSTITUTION_MODEL = TREELIKELIHOOD_FLAG_SUBSTITUTION_MODEL,
+  BRANCH_MODEL = TREELIKELIHOOD_FLAG_BRANCH_MODEL
+};
+
 class Interface {
  public:
   virtual void SetParameters(double_np parameters) = 0;
@@ -79,7 +92,7 @@ class UnRootedTreeModelInterface : public TreeModelInterface {
                              const std::vector<std::string> &taxa)
       : TreeModelInterface(newick, taxa, std::nullopt) {}
 
-  virtual ~UnRootedTreeModelInterface() {}
+  virtual ~UnRootedTreeModelInterface() { model_->free(model_); }
 
   void SetParameters(double_np parameters) override {
     auto data = parameters.data();
@@ -87,8 +100,12 @@ class UnRootedTreeModelInterface : public TreeModelInterface {
     Node *root = Tree_root(treeModel_);
     for (size_t i = 0; i < nodeCount_; i++) {
       Node *node = nodes[i];
-      if (node != root && root->right != node) {
+      if (node == root) continue;
+      if (root->right != node) {
         Node_set_distance(node, data[nodeMap_[node->id]]);
+      } else if (Node_isleaf(node)) {
+        Node *sibling = Node_sibling(node);
+        Node_set_distance(sibling, data[nodeMap_[node->id]]);
       }
     }
   }
@@ -104,7 +121,7 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
     transformModel_ = reinterpret_cast<Model *>(model_->data);
   }
 
-  virtual ~ReparameterizedTimeTreeModelInterface() {}
+  virtual ~ReparameterizedTimeTreeModelInterface() { model_->free(model_); }
 
   void SetParameters(double_np parameters) override {
     auto data = parameters.data();
@@ -182,7 +199,7 @@ class StrictClockModelInterface : public BranchModelInterface {
     free_Parameter(p);
     model_ = new_BranchModel2("", branchModel_, treeModel.model_, NULL);
   }
-  virtual ~StrictClockModelInterface() {}
+  virtual ~StrictClockModelInterface() { model_->free(model_); }
 
   void SetRate(double rate) {
     Parameters_set_value(branchModel_->rates, 0, rate);
@@ -217,7 +234,7 @@ class JC69Interface : public SubstitutionModelInterface {
     frequencies_model->free(frequencies_model);
   }
 
-  virtual ~JC69Interface() {}
+  virtual ~JC69Interface() { model_->free(model_); }
 
   void SetParameters(double_np parameters) override {}
   double_np GetParameters() override { return {}; }
@@ -235,7 +252,7 @@ class HKYInterface : public SubstitutionModelInterface {
     free_Parameters(kappa_parameters);
     frequencies_model->free(frequencies_model);
   }
-  virtual ~HKYInterface() {}
+  virtual ~HKYInterface() { model_->free(model_); }
   void SetKappa(double kappa) {
     Parameters_set_value(substModel_->rates, 0, kappa);
   }
@@ -272,7 +289,8 @@ class GTRInterface : public SubstitutionModelInterface {
     free_Parameters(rates_parameters);
     frequencies_model->free(frequencies_model);
   }
-  virtual ~GTRInterface() {}
+  virtual ~GTRInterface() { model_->free(model_); }
+
   void SetRates(double_np rates) {
     Parameters_set_values(substModel_->rates, rates.data());
   }
@@ -308,9 +326,7 @@ class ConstantSiteModelInterface : public SiteModelInterface {
     model_ = new_SiteModel2("sitemodel", siteModel_, NULL);
   }
 
-  virtual ~ConstantSiteModelInterface() {
-    // siteModel_->free(siteModel_);
-  }
+  virtual ~ConstantSiteModelInterface() { model_->free(model_); }
   void SetMu(double mu) { Parameter_set_value(siteModel_->mu, mu); }
   void SetParameters(double_np parameters) override {
     auto data = parameters.data();
@@ -347,7 +363,7 @@ class WeibullSiteModelInterface : public SiteModelInterface {
     free_Parameters(params);
   }
 
-  virtual ~WeibullSiteModelInterface() {}
+  virtual ~WeibullSiteModelInterface() { model_->free(model_); }
 
   void SetShape(double shape) {
     Parameters_set_value(siteModel_->rates, 0, shape);
@@ -416,13 +432,24 @@ class TreeLikelihoodInterface {
     model_ = new_TreeLikelihoodModel("id", tlk, treeModel_->model_,
                                      substitutionModel_->model_,
                                      siteModel_->model_, mbm);
+
+    tlk->include_jacobian = false;
     RequestGradient();
   }
 
+  ~TreeLikelihoodInterface() { model_->free(model_); }
+
   double LogLikelihood() { return model_->logP(model_); }
 
-  void RequestGradient(int flags = 0) {
-    gradientLength_ = TreeLikelihood_initialize_gradient(model_, flags);
+  void RequestGradient(std::vector<TreeLikelihoodGradientFlags> flags =
+                           std::vector<TreeLikelihoodGradientFlags>()) {
+    int flags_int = 0;
+    for (auto flag : flags) {
+      flags_int |=
+          static_cast<std::underlying_type<TreeLikelihoodGradientFlags>::type>(
+              flag);
+    }
+    gradientLength_ = TreeLikelihood_initialize_gradient(model_, flags_int);
   }
 
   double_np Gradient() {
@@ -465,8 +492,15 @@ class CoalescentModelInterface : public Interface {
 
   double LogLikelihood() { return model_->logP(model_); }
 
-  void RequestGradient(int flags = 0) {
-    gradientLength_ = Coalescent_initialize_gradient(model_, flags);
+  void RequestGradient(std::vector<CoalescentGradientFlags> flags =
+                           std::vector<CoalescentGradientFlags>()) {
+    int flags_int = 0;
+    for (auto flag : flags) {
+      flags_int |=
+          static_cast<std::underlying_type<CoalescentGradientFlags>::type>(
+              flag);
+    }
+    gradientLength_ = Coalescent_initialize_gradient(model_, flags_int);
   }
 
   double_np Gradient() {
@@ -650,4 +684,31 @@ PYBIND11_MODULE(physher, m) {
                                        "PiecewiseConstantCoalescentGridModel")
       .def(py::init<const std::vector<double>, const TreeModelInterface &,
                     double>());
+
+  py::module coalescent_gradient_flags =
+      m.def_submodule("coalescent_gradient_flags");
+  py::enum_<CoalescentGradientFlags>(coalescent_gradient_flags,
+                                     "coalescent_gradient_flags")
+      .value("TREE_RATIO", CoalescentGradientFlags::TREE_RATIO,
+             "gradient of reparameterizated node heights")
+      .value("TREE_HEIGHT", CoalescentGradientFlags::TREE_HEIGHT,
+             "gradient of node heights")
+      .value("THETA", CoalescentGradientFlags::THETA,
+             "gradient of population size parameters")
+      .export_values();
+
+  py::module tree_likelihood_gradient_flags =
+      m.def_submodule("tree_likelihood_gradient_flags");
+  py::enum_<TreeLikelihoodGradientFlags>(tree_likelihood_gradient_flags,
+                                         "tree_likelihood_gradient_flags")
+      .value("TREE_HEIGHT", TreeLikelihoodGradientFlags::TREE_HEIGHT,
+             "gradient of reparameterizated node heights")
+      .value("SITE_MODEL", TreeLikelihoodGradientFlags::SITE_MODEL,
+             "gradient of site model parameters")
+      .value("SUBSTITUTION_MODEL",
+             TreeLikelihoodGradientFlags::SUBSTITUTION_MODEL,
+             "gradient of substitution model parameters")
+      .value("BRANCH_MODEL", TreeLikelihoodGradientFlags::BRANCH_MODEL,
+             "gradient of branch model parameters")
+      .export_values();
 }

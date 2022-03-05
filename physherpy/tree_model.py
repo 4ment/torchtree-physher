@@ -1,6 +1,12 @@
 import torch
-import torchtree
 from torch.distributions import Transform
+
+import torchtree
+from physherpy.interface import Interface
+from physherpy.physher import (
+    ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
+)
+from physherpy.physher import UnRootedTreeModel as PhysherUnRootedTreeModel
 from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.evolution.taxa import Taxa
 from torchtree.evolution.tree_model import (
@@ -8,12 +14,6 @@ from torchtree.evolution.tree_model import (
 )
 from torchtree.evolution.tree_model import UnRootedTreeModel as TUnRootedTreeModel
 from torchtree.typing import ID
-
-from physherpy.interface import Interface
-from physherpy.physher import (
-    ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
-)
-from physherpy.physher import UnRootedTreeModel as PhysherUnRootedTreeModel
 
 
 def flatten_2D(tensor: torch.tensor) -> torch.tensor:

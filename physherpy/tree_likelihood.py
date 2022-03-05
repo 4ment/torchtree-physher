@@ -1,6 +1,8 @@
 from typing import Any
 
 import torch
+
+from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 from torchtree import TransformedParameter
 from torchtree.core.model import CallableModel
 from torchtree.core.utils import JSONParseError, process_object
@@ -11,8 +13,6 @@ from torchtree.evolution.site_pattern import SitePattern
 from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
-
-from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 
 
 class TreeLikelihoodModel(CallableModel):

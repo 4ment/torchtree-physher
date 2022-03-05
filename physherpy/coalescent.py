@@ -1,8 +1,6 @@
 import torch
-import torchtree.evolution.coalescent
-from torchtree.core.abstractparameter import AbstractParameter
-from torchtree.typing import ID
 
+import torchtree.evolution.coalescent
 from physherpy.interface import Interface
 from physherpy.physher import ConstantCoalescentModel as PhysherConstantCoalescentModel
 from physherpy.physher import (
@@ -14,6 +12,8 @@ from physherpy.physher import (
 from physherpy.physher import (
     ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
 )
+from torchtree.core.abstractparameter import AbstractParameter
+from torchtree.typing import ID
 
 
 def evaluate_coalescent(

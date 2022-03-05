@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 import physherpy
+import physherpy.physher.coalescent_gradient_flags as flags
 
 
 def test_constant_coalescent():
@@ -11,6 +12,7 @@ def test_constant_coalescent():
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
     constant = physherpy.physher.ConstantCoalescentModel(3.0, tree)
     assert constant.log_likelihood() == pytest.approx(-13.295836866)
+    constant.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     np.testing.assert_allclose(
         constant.gradient(), np.array([2.33333333, -1.0, -0.66666667, -0.33333333])
     )
@@ -27,6 +29,7 @@ def test_skyride():
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
     skyride = physherpy.physher.PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
+    skyride.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyride.log_likelihood() == pytest.approx(-11.487491742782)
     np.testing.assert_allclose(
         skyride.gradient(),
@@ -40,6 +43,7 @@ def test_skyride_heterochronous():
     )
     tree.set_parameters(np.array([2 / 3, 1 / 3, 4.0]))  # heights: 3.0, 10.0, 4.0
     skyride = physherpy.physher.PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
+    skyride.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyride.log_likelihood() == pytest.approx(-7.67082507611538)
     np.testing.assert_allclose(
         skyride.gradient(),
@@ -55,6 +59,7 @@ def test_skygrid():
     skyrgrid = physherpy.physher.PiecewiseConstantCoalescentGridModel(
         [3.0, 10.0, 4.0, 2.0, 3.0], tree, 10.0
     )
+    skyrgrid.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyrgrid.log_likelihood() == pytest.approx(-11.8751856)
     np.testing.assert_allclose(
         skyrgrid.gradient(),
@@ -111,6 +116,7 @@ def test_skygrid_heterochronous(cutoff, expected, gradient):
     skyrgrid = physherpy.physher.PiecewiseConstantCoalescentGridModel(
         thetas, tree, cutoff
     )
+    skyrgrid.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyrgrid.log_likelihood() == pytest.approx(expected)
     np.testing.assert_allclose(
         skyrgrid.gradient(),
