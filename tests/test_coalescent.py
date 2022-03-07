@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import physherpy
-import physherpy.physher.coalescent_gradient_flags as flags
+import physherpy.physher.gradient_flags as flags
 
 
 def test_constant_coalescent():
@@ -16,11 +16,6 @@ def test_constant_coalescent():
     np.testing.assert_allclose(
         constant.gradient(), np.array([2.33333333, -1.0, -0.66666667, -0.33333333])
     )
-
-    # physherpy.ReparameterizedTimeTreeModel(
-    #     'id',
-    # )
-    # physherpy.ConstantCoalescentModel(3.0)
 
 
 def test_skyride():

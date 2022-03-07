@@ -8,7 +8,9 @@
 namespace py = pybind11;
 
 extern "C" {
+#include "phyc/ctmcscale.h"
 #include "phyc/demographicmodels.h"
+#include "phyc/gradient.h"
 #include "phyc/parameters.h"
 #include "phyc/sequence.h"
 #include "phyc/simplex.h"
@@ -19,10 +21,10 @@ extern "C" {
 using double_np =
     py::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>;
 
-enum class CoalescentGradientFlags {
-  TREE_RATIO = COALESCENT_FLAG_TREE,
-  TREE_HEIGHT = COALESCENT_FLAG_TREE_HEIGHT,
-  THETA = COALESCENT_FLAG_THETA
+enum class GradientFlags {
+  TREE_RATIO = GRADIENT_FLAG_TREE_RATIOS,
+  TREE_HEIGHT = GRADIENT_FLAG_TREE_HEIGHTS,
+  COALESCENT_THETA = GRADIENT_FLAG_COALESCENT_THETA
 };
 
 enum class TreeLikelihoodGradientFlags {
@@ -147,18 +149,30 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
     double_np gradient(tipCount_ - 1);
     auto height_gradient_data = height_gradient.data();
     auto gradient_data = gradient.mutable_data();
+    Tree_update_heights(treeModel_);
     Tree_node_transform_jvp(treeModel_, height_gradient_data, gradient_data);
+    return gradient;
+  }
+
+  double_np GradientTransformJVP(double_np height_gradient, double_np heights) {
+    double_np gradient(tipCount_ - 1);
+    auto height_gradient_data = height_gradient.data();
+    auto gradient_data = gradient.mutable_data();
+    Tree_node_transform_jvp_with_heights(treeModel_, heights.data(),
+                                         height_gradient_data, gradient_data);
     return gradient;
   }
 
   double_np GradientTransformJacobian() {
     double_np gradient(tipCount_ - 1);
     auto gradient_data = gradient.mutable_data();
+    Tree_update_heights(treeModel_);
     Tree_node_transform_jacobian_gradient(treeModel_, gradient_data);
     return gradient;
   }
 
   double TransformJacobian() {
+    Tree_update_heights(treeModel_);
     TreeTransform *tt = reinterpret_cast<TreeTransform *>(transformModel_->obj);
     return tt->log_jacobian(tt);
   }
@@ -482,6 +496,63 @@ class TreeLikelihoodInterface {
   Model *model_;
 };
 
+class CTMCScaleModelInterface : public Interface {
+ public:
+  CTMCScaleModelInterface(const std::vector<double> rates,
+                          const TreeModelInterface &treeModel)
+      : treeModel_(treeModel) {
+    Parameters *rates_param = new_Parameters(rates.size());
+    for (size_t i = 0; i < rates.size(); i++) {
+      Parameters_move(rates_param, new_Parameter("", rates[i], NULL));
+    }
+    ctmc_scale = new_CTMCScale_with_parameters(
+        rates_param, reinterpret_cast<Tree *>(treeModel.model_->obj));
+    model_ = new_CTMCScaleModel("id", ctmc_scale, treeModel.model_);
+    RequestGradient();
+  }
+
+  virtual ~CTMCScaleModelInterface() {}
+
+  double LogLikelihood() { return model_->logP(model_); }
+
+  void RequestGradient(
+      std::vector<GradientFlags> flags = std::vector<GradientFlags>()) {
+    int flags_int = 0;
+    for (auto flag : flags) {
+      flags_int |= static_cast<std::underlying_type<GradientFlags>::type>(flag);
+    }
+    gradientLength_ = DistributionModel_initialize_gradient(model_, flags_int);
+  }
+
+  double_np Gradient() {
+    Tree_update_heights(reinterpret_cast<Tree *>(treeModel_.model_->obj));
+    double *gradient = DistributionModel_gradient(model_);
+    double_np values(gradientLength_);
+    auto data = values.mutable_data();
+    for (size_t i = 0; i < gradientLength_; i++) {
+      data[i] = gradient[i];
+    }
+    return values;
+  }
+
+  void SetParameters(double_np parameters) override {
+    Parameters_set_values(ctmc_scale->x, parameters.data());
+  }
+  double_np GetParameters() override {
+    double_np values = double_np(1);
+    auto data = values.mutable_data();
+    //
+    return values;
+  }
+
+ protected:
+  DistributionModel *ctmc_scale;
+
+ private:
+  const TreeModelInterface &treeModel_;
+  size_t gradientLength_;
+};
+
 class CoalescentModelInterface : public Interface {
  protected:
   explicit CoalescentModelInterface(const TreeModelInterface &treeModel)
@@ -492,13 +563,11 @@ class CoalescentModelInterface : public Interface {
 
   double LogLikelihood() { return model_->logP(model_); }
 
-  void RequestGradient(std::vector<CoalescentGradientFlags> flags =
-                           std::vector<CoalescentGradientFlags>()) {
+  void RequestGradient(
+      std::vector<GradientFlags> flags = std::vector<GradientFlags>()) {
     int flags_int = 0;
     for (auto flag : flags) {
-      flags_int |=
-          static_cast<std::underlying_type<CoalescentGradientFlags>::type>(
-              flag);
+      flags_int |= static_cast<std::underlying_type<GradientFlags>::type>(flag);
     }
     gradientLength_ = Coalescent_initialize_gradient(model_, flags_int);
   }
@@ -613,7 +682,13 @@ PYBIND11_MODULE(physher, m) {
       .def("get_node_heights",
            &ReparameterizedTimeTreeModelInterface::GetNodeHeights)
       .def("gradient_transform_jvp",
-           &ReparameterizedTimeTreeModelInterface::GradientTransformJVP)
+           static_cast<double_np (ReparameterizedTimeTreeModelInterface::*)(
+               double_np)>(
+               &ReparameterizedTimeTreeModelInterface::GradientTransformJVP))
+      .def("gradient_transform_jvp",
+           static_cast<double_np (ReparameterizedTimeTreeModelInterface::*)(
+               double_np, double_np)>(
+               &ReparameterizedTimeTreeModelInterface::GradientTransformJVP))
       .def("gradient_transform_jacobian",
            &ReparameterizedTimeTreeModelInterface::GradientTransformJacobian)
       .def("transform_jacobian",
@@ -685,15 +760,21 @@ PYBIND11_MODULE(physher, m) {
       .def(py::init<const std::vector<double>, const TreeModelInterface &,
                     double>());
 
-  py::module coalescent_gradient_flags =
-      m.def_submodule("coalescent_gradient_flags");
-  py::enum_<CoalescentGradientFlags>(coalescent_gradient_flags,
-                                     "coalescent_gradient_flags")
-      .value("TREE_RATIO", CoalescentGradientFlags::TREE_RATIO,
+  py::class_<CTMCScaleModelInterface>(m, "CTMCScaleModel")
+      .def(py::init<const std::vector<double>, const TreeModelInterface &>())
+      .def("log_likelihood", &CTMCScaleModelInterface::LogLikelihood)
+      .def("gradient", &CTMCScaleModelInterface::Gradient)
+      .def("request_gradient", &CTMCScaleModelInterface::RequestGradient)
+      .def("set_parameters", &CTMCScaleModelInterface::SetParameters)
+      .def("parameters", &CTMCScaleModelInterface::GetParameters);
+
+  py::module gradient_flags = m.def_submodule("gradient_flags");
+  py::enum_<GradientFlags>(gradient_flags, "coalescent_gradient_flags")
+      .value("TREE_RATIO", GradientFlags::TREE_RATIO,
              "gradient of reparameterizated node heights")
-      .value("TREE_HEIGHT", CoalescentGradientFlags::TREE_HEIGHT,
+      .value("TREE_HEIGHT", GradientFlags::TREE_HEIGHT,
              "gradient of node heights")
-      .value("THETA", CoalescentGradientFlags::THETA,
+      .value("THETA", GradientFlags::COALESCENT_THETA,
              "gradient of population size parameters")
       .export_values();
 

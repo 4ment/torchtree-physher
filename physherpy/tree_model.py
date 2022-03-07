@@ -1,7 +1,6 @@
 import torch
 from torch.distributions import Transform
 
-import torchtree
 from physherpy.interface import Interface
 from physherpy.physher import (
     ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
@@ -79,17 +78,24 @@ class NodeHeightAutogradFunction(torch.autograd.Function):
         node_heights = torch.stack(node_heights)
         if len(ratios_root_height.shape) != node_heights.shape:
             node_heights = node_heights.view(ratios_root_height.shape)
+        if ratios_root_height.requires_grad:
+            ctx.save_for_backward(node_heights)
         return node_heights
 
     @staticmethod
     def backward(ctx, grad_output):
+        (heights,) = ctx.saved_tensors
         grad = []
         tensor_flatten = flatten_2D(grad_output)
+        heights_numpy = flatten_2D(heights).numpy()
         grad_output_numpy = tensor_flatten.numpy()
         for batch_idx in range(tensor_flatten.shape[0]):
             grad.append(
                 torch.tensor(
-                    ctx.inst.gradient_transform_jvp(grad_output_numpy[batch_idx, ...])
+                    ctx.inst.gradient_transform_jvp(
+                        grad_output_numpy[batch_idx, ...],
+                        heights_numpy[batch_idx, ...],
+                    )
                 )
             )
         grad = torch.stack(grad)
