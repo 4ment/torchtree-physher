@@ -1,16 +1,17 @@
 import torch
-
-from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 from torchtree import TransformedParameter
 from torchtree.core.model import CallableModel
-from torchtree.core.utils import JSONParseError, process_object
-from torchtree.evolution.alignment import Alignment, read_fasta_sequences
+from torchtree.core.utils import JSONParseError, process_object, string_to_list_index
+from torchtree.evolution.alignment import Alignment, Sequence, read_fasta_sequences
 from torchtree.evolution.branch_model import BranchModel
 from torchtree.evolution.site_model import SiteModel
 from torchtree.evolution.site_pattern import SitePattern
 from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
+
+from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
+from physherpy.utils import flatten_2D
 
 
 class TreeLikelihoodModel(CallableModel):
@@ -51,6 +52,9 @@ class TreeLikelihoodModel(CallableModel):
         weibull_shape = (
             None if self.site_model.rates().shape[-1] == 1 else self.site_model.shape
         )
+
+        if self.site_model._mu is not None:
+            mu = self.site_model._mu.tensor
 
         if self.clock_model:
             branch_parameters = self.tree_model._internal_heights.tensor
@@ -112,6 +116,21 @@ class TreeLikelihoodModel(CallableModel):
         else:
             raise JSONParseError('site_pattern is misspecified')
 
+        if 'indices' in data[SitePattern.tag]:
+            indices = data[SitePattern.tag]['indices']
+            if indices is not None:
+                list_of_indices = [
+                    string_to_list_index(index_str) for index_str in indices.split(',')
+                ]
+                sequences_new = [""] * len(alignment)
+                for index in list_of_indices:
+                    for idx, seq in enumerate(alignment):
+                        sequences_new[idx] += seq.sequence[index]
+                alignment = [
+                    Sequence(alignment[idx].taxon, seq)
+                    for idx, seq in enumerate(sequences_new)
+                ]
+
         use_ambiguities = data.get('use_ambiguities', False)
         clock_model = None
         if BranchModel.tag in data:
@@ -139,7 +158,21 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         subst_frequencies=None,
         weibull_shape=None,
         mu=None,
-    ):
+    ) -> torch.Tensor:
+        """Evaluate log tree likelihood using physher
+
+        :param ctx: context
+        :param PhysherTreeLikelihood inst: physher tree likelihood instance
+        :param models: list of models to update
+        :type models: list
+        :param torch.Tensor branch_lengths: branch length or ratios tensor
+        :param torch.Tensor clock_rates: substitution rate tensor
+        :param torch.Tensor subst_rates: transition rate matrix biases tensor
+        :param torch.Tensor subst_frequencies: frequencies of the transition rate matrix
+        :param torch.Tensor weibull_shape: shape tensor of the Weibull distribution
+        :param torch.Tensor mu: mu tensor
+        :return:
+        """
         ctx.inst = inst
         ctx.save_for_backward(
             branch_lengths,
@@ -152,7 +185,8 @@ class TreeLikelihoodFunction(torch.autograd.Function):
 
         log_probs = []
         grads = []
-        for i in range(branch_lengths.shape[0]):
+        branch_lengths_flatten = flatten_2D(branch_lengths)
+        for i in range(branch_lengths_flatten.shape[0]):
             for model in models:
                 model.update(i)
             log_probs.append(torch.tensor([inst.log_likelihood()]))
@@ -162,7 +196,19 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         return torch.stack(log_probs)
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output) -> torch.Tensor:
+        """Compute gradient using physher
+
+        Derivatives returned by physher are concatenated in this order:
+         - branch length or ratios
+         - site model: weibull shape, pinv, mu
+         - clock model: substitution rate(s)
+         - substitution model: rate(s), frequencies
+
+        :param ctx: context
+        :param torch.Tensor grad_output:
+        :return torch.Tensor: gradient
+        """
         (
             branch_lengths,
             clock_rates,
@@ -176,6 +222,22 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             ..., : branch_lengths.shape[-1]
         ] * grad_output.unsqueeze(-1)
         offset = branch_lengths.shape[-1]
+
+        if weibull_shape is not None:
+            weibull_grad = ctx.grads[
+                ..., offset : (offset + weibull_shape.shape[-1])
+            ] * grad_output.unsqueeze(-1)
+            offset += weibull_shape.shape[-1]
+        else:
+            weibull_grad = None
+
+        if mu is not None:
+            mu_grad = ctx.grads[
+                ..., offset : (offset + mu.shape[-1])
+            ] * grad_output.unsqueeze(-1)
+            offset += mu.shape[-1]
+        else:
+            mu_grad = None
 
         if clock_rates is not None:
             clock_rate_grad = ctx.grads[
@@ -200,22 +262,6 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             offset += subst_frequencies.shape[-1]
         else:
             subst_frequencies_grad = None
-
-        if weibull_shape is not None:
-            weibull_grad = ctx.grads[
-                ..., offset : (offset + weibull_shape.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += weibull_shape.shape[-1]
-        else:
-            weibull_grad = None
-
-        if mu is not None:
-            mu_grad = ctx.grads[
-                ..., offset : (offset + mu.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += mu.shape[-1]
-        else:
-            mu_grad = None
 
         return (
             None,  # inst

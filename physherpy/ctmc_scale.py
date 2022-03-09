@@ -1,10 +1,10 @@
 import torch
-
 import torchtree.distributions.ctmc_scale
-from physherpy.interface import Interface
-from physherpy.physher import CTMCScaleModel as PhysherCTMCScaleModel
 from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.typing import ID
+
+from physherpy.interface import Interface
+from physherpy.physher import CTMCScaleModel as PhysherCTMCScaleModel
 
 
 class CTMCScale(torchtree.distributions.ctmc_scale.CTMCScale, Interface):

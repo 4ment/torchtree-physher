@@ -1,27 +1,33 @@
 import numpy as np
 import pytest
+import torch
+from torchtree import Parameter
+from torchtree.evolution.alignment import Alignment, Sequence
+from torchtree.evolution.datatype import NucleotideDataType
+from torchtree.evolution.taxa import Taxa, Taxon
+from torchtree.evolution.tree_model import parse_tree
 
 import physherpy.physher
 
 
 @pytest.mark.parametrize(
-    "newick,branch_lengths",
+    "newick",
     [
-        ("(((A:0.01,B:0.02):0.05,C:0.03):0.0,D:0.04);", np.arange(0.01, 0.06, 0.01)),
-        (
-            "(D:0.04,(C:0.03,(B:0.02,A:0.01):0.5):0.0);",
-            np.array([0.01, 0.02, 0.04, 0.03, 0.05]),
-        ),
+        "(((A:0.01,B:0.02):0.05,C:0.03):0.0,D:0.04);",
+        "(D:0.04,(C:0.03,(B:0.02,A:0.01):0.5):0.0);",
     ],
 )
 @pytest.mark.parametrize('use_ambiguities', [True, False])
-def test_unrooted(newick, branch_lengths, use_ambiguities):
+def test_unrooted(newick, use_ambiguities):
+    taxon_list = ['A', 'B', 'C', 'D']
+    sequence_list = [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT'), ('D', 'GCGT')]
     m = physherpy.physher.ConstantSiteModel(None)
     sm = physherpy.physher.JC69()
-    tree = physherpy.physher.UnRootedTreeModel(newick, ['A', 'B', 'C', 'D'])
-    tree.set_parameters(np.arange(0.01, 0.06, 0.01))
+    tree = physherpy.physher.UnRootedTreeModel(newick, taxon_list)
+    branch_lengths = np.arange(0.01, 0.06, 0.01)
+    tree.set_parameters(branch_lengths)
     tlk = physherpy.physher.TreeLikelihoodModel(
-        [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT'), ('D', 'GCGT')],
+        sequence_list,
         tree,
         sm,
         m,
@@ -29,6 +35,17 @@ def test_unrooted(newick, branch_lengths, use_ambiguities):
         use_ambiguities,
     )
     assert tlk.log_likelihood() == pytest.approx(-21.7658748626709)
+
+    pm = physherpy.ConstantSiteModel(None)
+    psm = physherpy.JC69(None)
+    taxa = Taxa(None, [Taxon(taxon, {}) for taxon in taxon_list])
+    tree = parse_tree(taxa, {'newick': newick})
+    blens = Parameter(None, torch.tensor(branch_lengths))
+    ptree = physherpy.UnRootedTreeModel(None, tree, taxa, blens)
+    sequences = [Sequence(taxon, seq) for taxon, seq in sequence_list]
+    alignment = Alignment(None, sequences, taxa, NucleotideDataType(None))
+    ptlk = physherpy.TreeLikelihoodModel(None, alignment, ptree, psm, pm)
+    assert ptlk() == pytest.approx(-21.7658748626709)
 
 
 def test_unrooted_weibull():

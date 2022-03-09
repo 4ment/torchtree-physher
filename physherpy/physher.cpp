@@ -207,7 +207,8 @@ class BranchModelInterface : public Interface {
 class StrictClockModelInterface : public BranchModelInterface {
  public:
   StrictClockModelInterface(double rate, const TreeModelInterface &treeModel) {
-    Parameter *p = new_Parameter("", rate, NULL);
+    Parameter *p =
+        new_Parameter("clock.rate", rate, new_Constraint(0, INFINITY));
     p->model = MODEL_BRANCHMODEL;
     branchModel_ = new_StrictClock_with_parameter(treeModel.treeModel_, p);
     free_Parameter(p);
@@ -258,9 +259,11 @@ class HKYInterface : public SubstitutionModelInterface {
  public:
   HKYInterface(double kappa, const std::vector<double> &frequencies) {
     Parameters *kappa_parameters = new_Parameters(1);
-    Parameters_move(kappa_parameters, new_Parameter("", kappa, NULL));
-    Simplex *frequencies_simplex =
-        new_Simplex_with_values("", frequencies.data(), frequencies.size());
+    Parameters_move(
+        kappa_parameters,
+        new_Parameter("hky_kappa", kappa, new_Constraint(0, INFINITY)));
+    Simplex *frequencies_simplex = new_Simplex_with_values(
+        "hky_frequencies", frequencies.data(), frequencies.size());
     Model *frequencies_model = new_SimplexModel("id", frequencies_simplex);
     model_ = Initialize("hky", kappa_parameters, frequencies_model);
     free_Parameters(kappa_parameters);
@@ -288,16 +291,18 @@ class GTRInterface : public SubstitutionModelInterface {
     Parameters *rates_parameters = NULL;
     // simplex
     if (rates.size() == 6) {
-      Simplex *rates_simplex =
-          new_Simplex_with_values("", rates.data(), rates.size());
+      Simplex *rates_simplex = new_Simplex_with_values(
+          "gtr_rate_simplex", rates.data(), rates.size());
     } else {
       rates_parameters = new_Parameters(5);
       for (auto rate : rates) {
-        Parameters_move(rates_parameters, new_Parameter("", rate, NULL));
+        Parameters_move(
+            rates_parameters,
+            new_Parameter("gtr_rates", rate, new_Constraint(0, INFINITY)));
       }
     }
-    Simplex *frequencies_simplex =
-        new_Simplex_with_values("", frequencies.data(), frequencies.size());
+    Simplex *frequencies_simplex = new_Simplex_with_values(
+        "gtr_frequencies", frequencies.data(), frequencies.size());
     Model *frequencies_model = new_SimplexModel("id", frequencies_simplex);
     model_ = Initialize("gtr", rates_parameters, frequencies_model);
     free_Parameters(rates_parameters);
@@ -333,7 +338,8 @@ class ConstantSiteModelInterface : public SiteModelInterface {
     siteModel_ = new_SiteModel_with_parameters(
         NULL, NULL, 1, DISTRIBUTION_UNIFORM, false, QUADRATURE_QUANTILE_MEDIAN);
     if (mu.has_value()) {
-      Parameter *mu_param = new_Parameter("mu", *mu, NULL);
+      Parameter *mu_param =
+          new_Parameter("mu", *mu, new_Constraint(0, INFINITY));
       SiteModel_set_mu(siteModel_, mu_param);
       free_Parameter(mu_param);
     }
@@ -349,12 +355,14 @@ class ConstantSiteModelInterface : public SiteModelInterface {
     }
   }
   double_np GetParameters() override {
-    double_np values = double_np(1);
-    auto data = values.mutable_data();
     if (siteModel_->mu != NULL) {
+      double_np values = double_np(1);
+      auto data = values.mutable_data();
       data[0] = Parameter_value(siteModel_->mu);
+      return values;
+    } else {
+      return {};
     }
-    return values;
   }
 };
 
@@ -362,14 +370,16 @@ class WeibullSiteModelInterface : public SiteModelInterface {
  public:
   WeibullSiteModelInterface(double shape, size_t categories,
                             std::optional<double> mu) {
-    Parameter *shape_parameter = new_Parameter("", shape, NULL);
+    Parameter *shape_parameter =
+        new_Parameter("weibull", shape, new_Constraint(0, INFINITY));
     Parameters *params = new_Parameters(1);
     Parameters_move(params, shape_parameter);
     siteModel_ = new_SiteModel_with_parameters(params, NULL, categories,
                                                DISTRIBUTION_WEIBULL, false,
                                                QUADRATURE_QUANTILE_MEDIAN);
     if (mu.has_value()) {
-      Parameter *mu_param = new_Parameter("mu", *mu, NULL);
+      Parameter *mu_param =
+          new_Parameter("mu", *mu, new_Constraint(0, INFINITY));
       SiteModel_set_mu(siteModel_, mu_param);
       free_Parameter(mu_param);
     }
@@ -503,7 +513,8 @@ class CTMCScaleModelInterface : public Interface {
       : treeModel_(treeModel) {
     Parameters *rates_param = new_Parameters(rates.size());
     for (size_t i = 0; i < rates.size(); i++) {
-      Parameters_move(rates_param, new_Parameter("", rates[i], NULL));
+      Parameters_move(rates_param,
+                      new_Parameter("", rates[i], new_Constraint(0, INFINITY)));
     }
     ctmc_scale = new_CTMCScale_with_parameters(
         rates_param, reinterpret_cast<Tree *>(treeModel.model_->obj));
@@ -605,7 +616,8 @@ class ConstantCoalescentModelInterface : public CoalescentModelInterface {
   ConstantCoalescentModelInterface(double theta,
                                    const TreeModelInterface &treeModel)
       : CoalescentModelInterface(treeModel) {
-    Parameter *theta_param = new_Parameter("", theta, NULL);
+    Parameter *theta_param =
+        new_Parameter("constant.theta", theta, new_Constraint(0, INFINITY));
     coalescent_ = new_ConstantCoalescent(
         reinterpret_cast<Tree *>(treeModel.model_->obj), theta_param);
     free_Parameter(theta_param);
@@ -622,7 +634,8 @@ class PiecewiseConstantCoalescentInterface : public CoalescentModelInterface {
       : CoalescentModelInterface(treeModel) {
     Parameters *thetas_param = new_Parameters(thetas.size());
     for (size_t i = 0; i < thetas.size(); i++) {
-      Parameters_move(thetas_param, new_Parameter("", thetas[i], NULL));
+      Parameters_move(thetas_param, new_Parameter("slyride.theta", thetas[i],
+                                                  new_Constraint(0, INFINITY)));
     }
     coalescent_ =
         new_SkyrideCoalescent(reinterpret_cast<Tree *>(treeModel.model_->obj),
@@ -643,7 +656,8 @@ class PiecewiseConstantCoalescentGridInterface
       : CoalescentModelInterface(treeModel) {
     Parameters *thetas_param = new_Parameters(thetas.size());
     for (size_t i = 0; i < thetas.size(); i++) {
-      Parameters_move(thetas_param, new_Parameter("", thetas[i], NULL));
+      Parameters_move(thetas_param, new_Parameter("skygrid.theta", thetas[i],
+                                                  new_Constraint(0, INFINITY)));
     }
     coalescent_ = new_GridCoalescent(
         reinterpret_cast<Tree *>(treeModel.model_->obj), thetas_param,
@@ -701,14 +715,14 @@ PYBIND11_MODULE(physher, m) {
       .def("set_parameters", &JC69Interface::SetParameters)
       .def("parameters", &JC69Interface::GetParameters);
 
-  py::class_<HKYInterface>(m, "HKY")
+  py::class_<HKYInterface, SubstitutionModelInterface>(m, "HKY")
       .def(py::init<double, const std::vector<double> &>())
       .def("set_kappa", &HKYInterface::SetKappa)
       .def("set_frequencies", &HKYInterface::SetFrequencies)
       .def("set_parameters", &HKYInterface::SetParameters)
       .def("parameters", &HKYInterface::GetParameters);
 
-  py::class_<GTRInterface>(m, "GTR")
+  py::class_<GTRInterface, SubstitutionModelInterface>(m, "GTR")
       .def(py::init<const std::vector<double> &, const std::vector<double> &>())
       .def("set_rates", &GTRInterface::SetRates)
       .def("set_frequencies", &GTRInterface::SetFrequencies)
