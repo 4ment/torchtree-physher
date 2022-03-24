@@ -24,6 +24,7 @@ class TreeLikelihoodModel(CallableModel):
         site_model: SiteModel,
         clock_model: BranchModel = None,
         use_ambiguities=False,
+        include_jacobian=False,
     ):
         super().__init__(id_)
         self.tree_model = tree_model
@@ -39,6 +40,7 @@ class TreeLikelihoodModel(CallableModel):
             site_model.inst,
             clock_inst,
             use_ambiguities,
+            include_jacobian,
         )
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
@@ -132,6 +134,8 @@ class TreeLikelihoodModel(CallableModel):
                 ]
 
         use_ambiguities = data.get('use_ambiguities', False)
+        include_jacobian = data.get('include_jacobian', False)
+
         clock_model = None
         if BranchModel.tag in data:
             clock_model = process_object(data[BranchModel.tag], dic)
@@ -143,6 +147,7 @@ class TreeLikelihoodModel(CallableModel):
             site_model,
             clock_model,
             use_ambiguities,
+            include_jacobian,
         )
 
 

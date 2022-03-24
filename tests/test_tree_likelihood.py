@@ -33,6 +33,7 @@ def test_unrooted(newick, use_ambiguities):
         m,
         None,
         use_ambiguities,
+        False,
     )
     assert tlk.log_likelihood() == pytest.approx(-21.7658748626709)
 
@@ -62,8 +63,52 @@ def test_unrooted_weibull():
         m,
         None,
         use_ambiguities,
+        False,
     )
     assert tlk.log_likelihood() == pytest.approx(-14.041006507122091)
     assert len(tlk.gradient()) == 4
     tree.set_parameters([0.01, 0.5, 0.2])
     assert tlk.log_likelihood() == pytest.approx(-15.25333438550469)
+
+
+@pytest.mark.parametrize(
+    "newick",
+    [
+        "(((A:0.01,B:0.02):0.05,C:0.03):0.0,D:0.04);",
+        "(D:0.04,(C:0.03,(B:0.02,A:0.01):0.5):0.0);",
+    ],
+)
+@pytest.mark.parametrize('use_ambiguities', [True, False])
+def test_unrooted_GTR(newick, use_ambiguities):
+    taxon_list = ['A', 'B', 'C', 'D']
+    sequence_list = [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT'), ('D', 'GCGT')]
+    m = physherpy.physher.ConstantSiteModel(None)
+    sm = physherpy.physher.GTR([1 / 6] * 6, [0.25] * 4)
+    tree = physherpy.physher.UnRootedTreeModel(newick, taxon_list)
+    branch_lengths = np.arange(0.01, 0.06, 0.01)
+    tree.set_parameters(branch_lengths)
+    tlk = physherpy.physher.TreeLikelihoodModel(
+        sequence_list,
+        tree,
+        sm,
+        m,
+        None,
+        use_ambiguities,
+        False,
+    )
+    assert tlk.log_likelihood() == pytest.approx(-21.7658748626709)
+
+    pm = physherpy.ConstantSiteModel(None)
+    psm = physherpy.GTR(
+        None,
+        Parameter('rates', torch.full([6], 1.0 / 6)),
+        Parameter('freqs', torch.full([4], 0.25)),
+    )
+    taxa = Taxa(None, [Taxon(taxon, {}) for taxon in taxon_list])
+    tree = parse_tree(taxa, {'newick': newick})
+    blens = Parameter(None, torch.tensor(branch_lengths))
+    ptree = physherpy.UnRootedTreeModel(None, tree, taxa, blens)
+    sequences = [Sequence(taxon, seq) for taxon, seq in sequence_list]
+    alignment = Alignment(None, sequences, taxa, NucleotideDataType(None))
+    ptlk = physherpy.TreeLikelihoodModel(None, alignment, ptree, psm, pm)
+    assert ptlk() == pytest.approx(-21.7658748626709)

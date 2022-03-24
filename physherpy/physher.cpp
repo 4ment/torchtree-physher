@@ -227,12 +227,16 @@ class SubstitutionModelInterface : public Interface {
 
  protected:
   Model *Initialize(const std::string &name, Parameters *rates,
-                    Model *frequencies) {
+                    Model *frequencies, Model *rates_model) {
     DataType *datatype = new_NucleotideDataType();
+    Simplex *rates_simplex =
+        rates_model == NULL ? NULL
+                            : reinterpret_cast<Simplex *>(rates_model->obj);
     substModel_ = SubstitutionModel_factory(
         name.c_str(), datatype, reinterpret_cast<Simplex *>(frequencies->obj),
-        NULL, rates, NULL);
-    Model *model = new_SubstitutionModel2("", substModel_, frequencies, NULL);
+        rates_simplex, rates, NULL);
+    Model *model = new_SubstitutionModel2(name.c_str(), substModel_,
+                                          frequencies, rates_model);
     free_DataType(datatype);
     return model;
   }
@@ -243,9 +247,10 @@ class SubstitutionModelInterface : public Interface {
 class JC69Interface : public SubstitutionModelInterface {
  public:
   JC69Interface() {
-    Simplex *frequencies_simplex = new_Simplex("", 4);
-    Model *frequencies_model = new_SimplexModel("", frequencies_simplex);
-    model_ = Initialize("JC69", NULL, frequencies_model);
+    Simplex *frequencies_simplex = new_Simplex("jc69_frequency_simplex", 4);
+    Model *frequencies_model =
+        new_SimplexModel("jc69_frequencies", frequencies_simplex);
+    model_ = Initialize("jc69", NULL, frequencies_model, NULL);
     frequencies_model->free(frequencies_model);
   }
 
@@ -263,9 +268,10 @@ class HKYInterface : public SubstitutionModelInterface {
         kappa_parameters,
         new_Parameter("hky_kappa", kappa, new_Constraint(0, INFINITY)));
     Simplex *frequencies_simplex = new_Simplex_with_values(
-        "hky_frequencies", frequencies.data(), frequencies.size());
-    Model *frequencies_model = new_SimplexModel("id", frequencies_simplex);
-    model_ = Initialize("hky", kappa_parameters, frequencies_model);
+        "hky_frequency_simplex", frequencies.data(), frequencies.size());
+    Model *frequencies_model =
+        new_SimplexModel("hky_frequencies", frequencies_simplex);
+    model_ = Initialize("hky", kappa_parameters, frequencies_model, NULL);
     free_Parameters(kappa_parameters);
     frequencies_model->free(frequencies_model);
   }
@@ -289,10 +295,12 @@ class GTRInterface : public SubstitutionModelInterface {
   GTRInterface(const std::vector<double> &rates,
                const std::vector<double> &frequencies) {
     Parameters *rates_parameters = NULL;
+    Model *rates_model = NULL;
     // simplex
     if (rates.size() == 6) {
       Simplex *rates_simplex = new_Simplex_with_values(
           "gtr_rate_simplex", rates.data(), rates.size());
+      rates_model = new_SimplexModel("gtr_rates", rates_simplex);
     } else {
       rates_parameters = new_Parameters(5);
       for (auto rate : rates) {
@@ -302,16 +310,26 @@ class GTRInterface : public SubstitutionModelInterface {
       }
     }
     Simplex *frequencies_simplex = new_Simplex_with_values(
-        "gtr_frequencies", frequencies.data(), frequencies.size());
-    Model *frequencies_model = new_SimplexModel("id", frequencies_simplex);
-    model_ = Initialize("gtr", rates_parameters, frequencies_model);
+        "gtr_frequency_simplex", frequencies.data(), frequencies.size());
+    Model *frequencies_model =
+        new_SimplexModel("gtr_frequencies", frequencies_simplex);
+    model_ =
+        Initialize("gtr", rates_parameters, frequencies_model, rates_model);
     free_Parameters(rates_parameters);
     frequencies_model->free(frequencies_model);
+    if (rates_model != NULL) {
+      rates_model->free(rates_model);
+    }
   }
   virtual ~GTRInterface() { model_->free(model_); }
 
   void SetRates(double_np rates) {
-    Parameters_set_values(substModel_->rates, rates.data());
+    if (substModel_->rates == NULL) {
+      substModel_->rates_simplex->set_values(substModel_->rates_simplex,
+                                             rates.data());
+    } else {
+      Parameters_set_values(substModel_->rates, rates.data());
+    }
   }
   void SetFrequencies(double_np frequencies) {
     substModel_->simplex->set_values(substModel_->simplex, frequencies.data());
@@ -431,7 +449,7 @@ class TreeLikelihoodInterface {
       SubstitutionModelInterface *substitutionModel,
       SiteModelInterface *siteModel,
       std::optional<BranchModelInterface *> branchModel,
-      bool use_ambiguities = false)
+      bool use_ambiguities = false, bool include_jacobian = false)
       : treeModel_(treeModel),
         substitutionModel_(substitutionModel),
         siteModel_(siteModel) {
@@ -674,7 +692,7 @@ PYBIND11_MODULE(physher, m) {
       .def(py::init<const std::vector<std::pair<std::string, std::string>> &,
                     TreeModelInterface *, SubstitutionModelInterface *,
                     SiteModelInterface *, std::optional<BranchModelInterface *>,
-                    bool>())
+                    bool, bool>())
       .def("log_likelihood", &TreeLikelihoodInterface::LogLikelihood)
       .def("gradient", &TreeLikelihoodInterface::Gradient)
       .def("request_gradient", &TreeLikelihoodInterface::RequestGradient);
