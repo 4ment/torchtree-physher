@@ -128,7 +128,9 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
   void SetParameters(double_np parameters) override {
     auto data = parameters.data();
     TreeTransform *tt = reinterpret_cast<TreeTransform *>(transformModel_->obj);
-    Parameters_set_values(tt->parameters, data);
+    Parameters_set_values_quietly(tt->parameters, data);
+    transformModel_->listeners->fire(transformModel_->listeners,
+                                     transformModel_, -1);
   }
 
   double_np GetParameters() override { return {}; }
@@ -166,6 +168,7 @@ class ReparameterizedTimeTreeModelInterface : public TreeModelInterface {
   double_np GradientTransformJacobian() {
     double_np gradient(tipCount_ - 1);
     auto gradient_data = gradient.mutable_data();
+    memset(gradient_data, 0.0, sizeof(double) * (tipCount_ - 1));
     Tree_update_heights(treeModel_);
     Tree_node_transform_jacobian_gradient(treeModel_, gradient_data);
     return gradient;
@@ -475,7 +478,7 @@ class TreeLikelihoodInterface {
                                      substitutionModel_->model_,
                                      siteModel_->model_, mbm);
 
-    tlk->include_jacobian = false;
+    tlk->include_jacobian = include_jacobian;
     RequestGradient();
   }
 

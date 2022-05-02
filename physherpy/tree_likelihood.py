@@ -10,6 +10,7 @@ from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
 
+import physherpy.physher.gradient_flags as flags
 from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 from physherpy.utils import flatten_2D
 
@@ -139,6 +140,8 @@ class TreeLikelihoodModel(CallableModel):
         clock_model = None
         if BranchModel.tag in data:
             clock_model = process_object(data[BranchModel.tag], dic)
+            tree_model.zero_jacobian = include_jacobian
+
         return cls(
             id_,
             alignment,
@@ -188,12 +191,28 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             mu,
         )
 
+        rate_need_update = True
+        if clock_rates is not None and clock_rates.dim() == 1:
+            models[3].update(0)
+            rate_need_update = False
+
+            if branch_lengths.requires_grad and not clock_rates.requires_grad:
+                physher_flags = [flags.TREELIKELIHOOD_FLAG_TREE]
+                if subst_rates is not None or subst_frequencies is not None:
+                    physher_flags.append(flags.TREELIKELIHOOD_FLAG_SUBSTITUTION_MODEL)
+                if weibull_shape is not None:
+                    physher_flags.append(flags.TREELIKELIHOOD_FLAG_SITE_MODEL)
+                inst.request_gradient(physher_flags)
+
         log_probs = []
         grads = []
         branch_lengths_flatten = flatten_2D(branch_lengths)
         for i in range(branch_lengths_flatten.shape[0]):
-            for model in models:
+            for model in models[:3]:
                 model.update(i)
+            if rate_need_update:
+                models[3].update(i)
+
             log_probs.append(torch.tensor([inst.log_likelihood()]))
             if branch_lengths.requires_grad:
                 grads.append(torch.tensor(inst.gradient()))

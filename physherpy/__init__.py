@@ -4,6 +4,7 @@ from physherpy.coalescent import (
     PiecewiseConstantCoalescentGridModel,
     PiecewiseConstantCoalescentModel,
 )
+from physherpy.ctmc_scale import CTMCScale
 from physherpy.site_model import ConstantSiteModel, WeibullSiteModel
 from physherpy.substitution_model import GTR, HKY, JC69
 from physherpy.tree_likelihood import TreeLikelihoodModel

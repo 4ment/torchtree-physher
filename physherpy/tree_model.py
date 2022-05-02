@@ -131,11 +131,15 @@ class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
             self.sampling_times.tolist(),
         )
         self.inst.set_parameters(ratios_root_heights.tensor.tolist())
+        self.zero_jacobian = False
 
     def update(self, index):
         self.inst.set_parameters(self._internal_heights.tensor[index].detach().numpy())
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
+        if self.zero_jacobian:
+            return torch.zeros(1)
+
         if self.heights_need_update:
             self.update_node_heights()
         return GeneralNodeHeightTransform(self.inst).log_abs_det_jacobian(
