@@ -224,6 +224,38 @@ class StrictClockModelInterface : public BranchModelInterface {
   }
 };
 
+class SimpleClockModelInterface : public BranchModelInterface {
+ public:
+  SimpleClockModelInterface(const std::vector<double> &rates,
+                            const TreeModelInterface &treeModel) {
+    Parameters *ps = new_Parameters(treeModel.nodeCount_ - 1);
+    DiscreteParameter *map = new_DiscreteParameter(treeModel.nodeCount_);
+    StringBuffer *buffer = new_StringBuffer(10);
+    for (int i = 0; i < treeModel.nodeCount_; i++) {
+      Node *node = Tree_node(treeModel.treeModel_, i);
+      if (!Node_isroot(node)) {
+        size_t index = Node_isleaf(node) ? node->class_id
+                                         : node->class_id + treeModel.tipCount_;
+        map->values[Node_id(node)] = index;
+        StringBuffer_set_string(buffer, "clock_rates");
+        StringBuffer_append_format(buffer, ".%d", index);
+        Parameter *p =
+            new_Parameter(buffer->c, rates[index], new_Constraint(0, INFINITY));
+        p->id = Node_id(node);
+        p->model = MODEL_BRANCHMODEL;
+        Parameters_move(ps, p);
+      }
+    }
+    free_StringBuffer(buffer);
+    branchModel_ =
+        new_DiscreteClock_with_parameters(treeModel.treeModel_, ps, map);
+    free_Parameters(ps);
+    model_ =
+        new_BranchModel2("simple_clock", branchModel_, treeModel.model_, NULL);
+  }
+  virtual ~SimpleClockModelInterface() { model_->free(model_); }
+};
+
 class SubstitutionModelInterface : public Interface {
  public:
   virtual ~SubstitutionModelInterface() {}
@@ -452,7 +484,8 @@ class TreeLikelihoodInterface {
       SubstitutionModelInterface *substitutionModel,
       SiteModelInterface *siteModel,
       std::optional<BranchModelInterface *> branchModel,
-      bool use_ambiguities = false, bool include_jacobian = false)
+      bool use_ambiguities = false, bool use_tip_states = false,
+      bool include_jacobian = false)
       : treeModel_(treeModel),
         substitutionModel_(substitutionModel),
         siteModel_(siteModel) {
@@ -473,7 +506,7 @@ class TreeLikelihoodInterface {
         reinterpret_cast<Tree *>(treeModel_->model_->obj),
         reinterpret_cast<SubstitutionModel *>(substitutionModel_->model_->obj),
         reinterpret_cast<SiteModel *>(siteModel_->model_->obj), sitePattern, bm,
-        !use_ambiguities);
+        use_tip_states);
     model_ = new_TreeLikelihoodModel("id", tlk, treeModel_->model_,
                                      substitutionModel_->model_,
                                      siteModel_->model_, mbm);
@@ -695,7 +728,7 @@ PYBIND11_MODULE(physher, m) {
       .def(py::init<const std::vector<std::pair<std::string, std::string>> &,
                     TreeModelInterface *, SubstitutionModelInterface *,
                     SiteModelInterface *, std::optional<BranchModelInterface *>,
-                    bool, bool>())
+                    bool, bool, bool>())
       .def("log_likelihood", &TreeLikelihoodInterface::LogLikelihood)
       .def("gradient", &TreeLikelihoodInterface::Gradient)
       .def("request_gradient", &TreeLikelihoodInterface::RequestGradient);
@@ -773,6 +806,12 @@ PYBIND11_MODULE(physher, m) {
       .def("set_parameters", &StrictClockModelInterface::SetParameters)
       .def("parameters", &StrictClockModelInterface::GetParameters)
       .def("set_rate", &StrictClockModelInterface::SetRate);
+
+  py::class_<SimpleClockModelInterface, BranchModelInterface>(
+      m, "SimpleClockModel")
+      .def(py::init<const std::vector<double> &, TreeModelInterface &>())
+      .def("set_parameters", &SimpleClockModelInterface::SetParameters)
+      .def("parameters", &SimpleClockModelInterface::GetParameters);
 
   py::class_<CoalescentModelInterface>(m, "CoalescentModelInterface")
       .def("log_likelihood", &CoalescentModelInterface::LogLikelihood)

@@ -10,7 +10,7 @@ from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
 
-import physherpy.physher.gradient_flags as flags
+import physherpy.physher.tree_likelihood_gradient_flags as flags
 from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
 from physherpy.utils import flatten_2D
 
@@ -25,6 +25,7 @@ class TreeLikelihoodModel(CallableModel):
         site_model: SiteModel,
         clock_model: BranchModel = None,
         use_ambiguities=False,
+        use_tip_states=False,
         include_jacobian=False,
     ):
         super().__init__(id_)
@@ -41,6 +42,7 @@ class TreeLikelihoodModel(CallableModel):
             site_model.inst,
             clock_inst,
             use_ambiguities,
+            use_tip_states,
             include_jacobian,
         )
 
@@ -88,9 +90,6 @@ class TreeLikelihoodModel(CallableModel):
             mu,
         )
 
-    def handle_model_changed(self, model, obj, index):
-        self.fire_model_changed()
-
     def handle_parameter_changed(self, variable, index, event):
         pass
 
@@ -135,6 +134,7 @@ class TreeLikelihoodModel(CallableModel):
                 ]
 
         use_ambiguities = data.get('use_ambiguities', False)
+        use_tip_states = data.get('use_tip_states', False)
         include_jacobian = data.get('include_jacobian', False)
 
         clock_model = None
@@ -150,6 +150,7 @@ class TreeLikelihoodModel(CallableModel):
             site_model,
             clock_model,
             use_ambiguities,
+            use_tip_states,
             include_jacobian,
         )
 
@@ -192,17 +193,21 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         )
 
         rate_need_update = True
+        # Fixed clock rate
         if clock_rates is not None and clock_rates.dim() == 1:
             models[3].update(0)
             rate_need_update = False
 
             if branch_lengths.requires_grad and not clock_rates.requires_grad:
-                physher_flags = [flags.TREELIKELIHOOD_FLAG_TREE]
+                physher_flags = [flags.TREE_HEIGHT]
                 if subst_rates is not None or subst_frequencies is not None:
-                    physher_flags.append(flags.TREELIKELIHOOD_FLAG_SUBSTITUTION_MODEL)
+                    physher_flags.append(flags.SUBSTITUTION_MODEL)
                 if weibull_shape is not None:
-                    physher_flags.append(flags.TREELIKELIHOOD_FLAG_SITE_MODEL)
+                    physher_flags.append(flags.SITE_MODEL)
                 inst.request_gradient(physher_flags)
+        # Unrooted tree
+        elif clock_rates is None:
+            rate_need_update = False
 
         log_probs = []
         grads = []

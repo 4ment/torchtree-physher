@@ -1,4 +1,4 @@
-from physherpy.branch_model import StrictClockModel
+from physherpy.branch_model import SimpleClockModel, StrictClockModel
 from physherpy.coalescent import (
     ConstantCoalescentModel,
     PiecewiseConstantCoalescentGridModel,
