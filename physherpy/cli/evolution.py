@@ -3,7 +3,7 @@ def process_tree_likelihood(arg, json_tree_likelihood):
 
     for model in ('tree_model', 'site_model', 'substitution_model'):
         json_tree_likelihood[model]['type'] = (
-        'physherpy.' + json_tree_likelihood[model]['type']
+            'physherpy.' + json_tree_likelihood[model]['type']
         )
     if arg.clock is not None:
         json_tree_likelihood['branch_model']['type'] = (

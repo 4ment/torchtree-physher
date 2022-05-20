@@ -69,6 +69,9 @@ class TreeLikelihoodModel(CallableModel):
 
         subst_rates = None
         subst_frequencies = None
+        # physher calculates derivatives wrt to reparameterized rates and frequencies
+        # If non reparameterized values are provided we can still calculate likelihoods
+        # (as in the tests) but not the gradient
         if isinstance(self.subst_model._frequencies, TransformedParameter):
             subst_frequencies = self.subst_model._frequencies.x.tensor
 

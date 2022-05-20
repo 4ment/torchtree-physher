@@ -73,6 +73,53 @@ def test_unrooted_weibull():
     assert tlk.log_likelihood() == pytest.approx(-15.25333438550469)
 
 
+def test_unrooted_weibull2():
+    shape = Parameter('shape', torch.tensor([0.1]))
+    m = physherpy.site_model.WeibullSiteModel('weibull', shape, 4)
+    sm = physherpy.JC69('jc')
+    tree_model_json = physherpy.UnRootedTreeModel.json_factory(
+        'tree',
+        '(A:0.2,(B:0.1,C:0.2):0.0);',
+        [0.2, 0.1, 0.2],
+        {'A': '', 'B': '', 'C': ''},
+        **{'keep_branch_lengths': True}
+    )
+    print(tree_model_json)
+    tree_model_json['type'] = 'physherpy.' + tree_model_json['type']
+    tree_model = physherpy.UnRootedTreeModel.from_json(
+        tree_model_json,
+        {},
+    )
+    tlk = physherpy.TreeLikelihoodModel(
+        'id',
+        [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT')],
+        tree_model,
+        sm,
+        m,
+        None,
+        False,
+        False,
+        False,
+    )
+    shape.tensor = torch.tensor([[0.1]])
+    tree_model._branch_lengths.tensor = torch.tensor([[0.2, 0.1, 0.2]])
+    m.update(0)
+    tree_model.update(0)
+    # tree_model.inst.set_parameters([0.01, 0.5, 0.2])
+    # m.inst.set_parameters([0.1])
+    # tlk.lp_needs_update = True
+    assert tlk() == pytest.approx(-14.041006507122091)
+    tree_model._branch_lengths.tensor = torch.tensor([[0.01, 0.5, 0.2]])
+    m.update(0)
+    assert tlk() == pytest.approx(-15.25333438550469)
+
+    shape.tensor = torch.tensor([[0.5]])
+    tree_model._branch_lengths.tensor = torch.tensor([[0.2, 0.1, 0.2]])
+    m.update(0)
+    tree_model.update(0)
+    assert tlk() == pytest.approx(-13.26174426466766)
+
+
 @pytest.mark.parametrize(
     "newick",
     [
@@ -113,5 +160,14 @@ def test_unrooted_GTR(newick, use_tip_states):
     ptree = physherpy.UnRootedTreeModel(None, tree, taxa, blens)
     sequences = [Sequence(taxon, seq) for taxon, seq in sequence_list]
     alignment = Alignment(None, sequences, taxa, NucleotideDataType(None))
+    psm._rates.tensor = torch.full([1, 6], 1.0 / 6)
+    psm._frequencies.tensor = torch.full([1, 4], 0.25)
+    ptree._branch_lengths.tensor = torch.tensor(branch_lengths).unsqueeze(0)
     ptlk = physherpy.TreeLikelihoodModel(None, alignment, ptree, psm, pm)
     assert ptlk() == pytest.approx(-21.7658748626709)
+
+    psm._rates.tensor = torch.full([1, 6], 1.0 / 6)
+    psm._frequencies.tensor = torch.full([1, 4], 0.25)
+    ptree._branch_lengths.tensor = torch.tensor(branch_lengths).unsqueeze(0) + 1.0
+    ptlk = physherpy.TreeLikelihoodModel(None, alignment, ptree, psm, pm)
+    assert ptlk() != pytest.approx(-21.7658748626709)

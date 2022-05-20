@@ -37,6 +37,6 @@ class WeibullSiteModel(TorchtreeWeibullSiteModel, Interface):
         )
 
     def update(self, index):
-        self.inst.set_shape(self._shape.tensor[index])
+        self.inst.set_shape(self._shape.tensor[index].item())
         if self._mu is not None:
-            self.inst.set_mu(self._mu.tensor[index])
+            self.inst.set_mu(self._mu.tensor[index].item())
