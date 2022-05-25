@@ -99,7 +99,7 @@ if __name__ == '__main__':
                     get_pybind_include(),
                 ],
                 language='c++',
-                libraries=['phyc'],
+                libraries=['phyc', 'phycpp'],
             ),
         ],
         'cmdclass': {'build_ext': BuildExt},
