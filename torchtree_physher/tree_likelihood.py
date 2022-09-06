@@ -10,9 +10,10 @@ from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
 
-import physherpy.physher.tree_likelihood_gradient_flags as flags
-from physherpy.physher import TreeLikelihoodModel as PhysherTreeLikelihood
-from physherpy.utils import flatten_2D
+import torchtree_physher.physher.tree_likelihood_gradient_flags as flags
+
+from .physher import TreeLikelihoodModel as PhysherTreeLikelihood
+from .utils import flatten_2D
 
 
 class TreeLikelihoodModel(CallableModel):

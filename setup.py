@@ -92,8 +92,8 @@ if __name__ == '__main__':
     kwargs = {
         'ext_modules': [
             Extension(
-                'physherpy.physher',
-                ['physherpy/physher.cpp'],
+                'torchtree_physher.physher',
+                ['torchtree_physher/physher.cpp'],
                 include_dirs=[
                     # Path to pybind11 headers
                     get_pybind_include(),

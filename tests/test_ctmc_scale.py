@@ -1,12 +1,11 @@
 import numpy as np
 import pytest
 
-import physherpy
-from physherpy.physher import CTMCScaleModel
+from torchtree_physher.physher import CTMCScaleModel, ReparameterizedTimeTreeModel
 
 
 def test_ctmc_scale():
-    tree_model = physherpy.physher.ReparameterizedTimeTreeModel(
+    tree_model = ReparameterizedTimeTreeModel(
         "((((A_0:1.5,B_1:0.5):2.5,C_2:2):2,D_3:3):10,E_12:4);",
         ['A_0', 'B_1', 'C_2', 'D_3', 'E_12'],
         [0.0, 1.0, 2.0, 3.0, 12.0],

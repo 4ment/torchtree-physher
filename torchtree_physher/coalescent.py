@@ -3,17 +3,15 @@ import torchtree.evolution.coalescent
 from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.typing import ID
 
-from physherpy.interface import Interface
-from physherpy.physher import ConstantCoalescentModel as PhysherConstantCoalescentModel
-from physherpy.physher import (
+from .interface import Interface
+from .physher import ConstantCoalescentModel as PhysherConstantCoalescentModel
+from .physher import (
     PiecewiseConstantCoalescentGridModel as PhysherPiecewiseConstantCoalescentGridModel,
 )
-from physherpy.physher import (
+from .physher import (
     PiecewiseConstantCoalescentModel as PhysherPiecewiseConstantCoalescentModel,
 )
-from physherpy.physher import (
-    ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
-)
+from .physher import ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel
 
 
 def evaluate_coalescent(

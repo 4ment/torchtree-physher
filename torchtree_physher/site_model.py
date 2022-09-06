@@ -5,9 +5,9 @@ from torchtree.evolution.site_model import (
 from torchtree.evolution.site_model import WeibullSiteModel as TorchtreeWeibullSiteModel
 from torchtree.typing import ID
 
-from physherpy.interface import Interface
-from physherpy.physher import ConstantSiteModel as PhysherConstantSiteModel
-from physherpy.physher import WeibullSiteModel as PhysherWeibullSiteModel
+from .interface import Interface
+from .physher import ConstantSiteModel as PhysherConstantSiteModel
+from .physher import WeibullSiteModel as PhysherWeibullSiteModel
 
 
 class ConstantSiteModel(TorchtreeConstantSiteModel, Interface):

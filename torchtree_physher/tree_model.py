@@ -8,12 +8,10 @@ from torchtree.evolution.tree_model import (
 from torchtree.evolution.tree_model import UnRootedTreeModel as TUnRootedTreeModel
 from torchtree.typing import ID
 
-from physherpy.interface import Interface
-from physherpy.physher import (
-    ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
-)
-from physherpy.physher import UnRootedTreeModel as PhysherUnRootedTreeModel
-from physherpy.utils import flatten_2D
+from .interface import Interface
+from .physher import ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel
+from .physher import UnRootedTreeModel as PhysherUnRootedTreeModel
+from .utils import flatten_2D
 
 
 class GeneralNodeHeightTransform(Transform):

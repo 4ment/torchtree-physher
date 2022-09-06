@@ -3,9 +3,9 @@ from torchtree.evolution.branch_model import SimpleClockModel as TSimpleClockMod
 from torchtree.evolution.branch_model import StrictClockModel as TStrictClockModel
 from torchtree.typing import ID
 
-from physherpy.interface import Interface
-from physherpy.physher import SimpleClockModel as PhysherSimpleClockModel
-from physherpy.physher import StrictClockModel as PhysherStrictClockModel
+from .interface import Interface
+from .physher import SimpleClockModel as PhysherSimpleClockModel
+from .physher import StrictClockModel as PhysherStrictClockModel
 
 
 class StrictClockModel(TStrictClockModel, Interface):

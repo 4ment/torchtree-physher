@@ -1,16 +1,21 @@
 import numpy as np
 import pytest
 
-import physherpy
-import physherpy.physher.gradient_flags as flags
+import torchtree_physher.physher.gradient_flags as flags
+from torchtree_physher.physher import (
+    ConstantCoalescentModel,
+    PiecewiseConstantCoalescentGridModel,
+    PiecewiseConstantCoalescentModel,
+    ReparameterizedTimeTreeModel,
+)
 
 
 def test_constant_coalescent():
-    tree = physherpy.physher.ReparameterizedTimeTreeModel(
+    tree = ReparameterizedTimeTreeModel(
         "(((A,B),C),D);", ['A', 'B', 'C', 'D'], [0.0, 0.0, 0.0, 0.0]
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
-    constant = physherpy.physher.ConstantCoalescentModel(3.0, tree)
+    constant = ConstantCoalescentModel(3.0, tree)
     assert constant.log_likelihood() == pytest.approx(-13.295836866)
     constant.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     np.testing.assert_allclose(
@@ -19,11 +24,11 @@ def test_constant_coalescent():
 
 
 def test_skyride():
-    tree = physherpy.physher.ReparameterizedTimeTreeModel(
+    tree = ReparameterizedTimeTreeModel(
         "(((A,B),C),D);", ['A', 'B', 'C', 'D'], [0.0, 0.0, 0.0, 0.0]
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
-    skyride = physherpy.physher.PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
+    skyride = PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
     skyride.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyride.log_likelihood() == pytest.approx(-11.487491742782)
     np.testing.assert_allclose(
@@ -33,11 +38,11 @@ def test_skyride():
 
 
 def test_skyride_heterochronous():
-    tree = physherpy.physher.ReparameterizedTimeTreeModel(
+    tree = ReparameterizedTimeTreeModel(
         "((A,B),(C,D));", ['A', 'B', 'C', 'D'], [0.0, 1.0, 1.0, 0.0]
     )
     tree.set_parameters(np.array([2 / 3, 1 / 3, 4.0]))  # heights: 3.0, 10.0, 4.0
-    skyride = physherpy.physher.PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
+    skyride = PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
     skyride.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyride.log_likelihood() == pytest.approx(-7.67082507611538)
     np.testing.assert_allclose(
@@ -47,11 +52,11 @@ def test_skyride_heterochronous():
 
 
 def test_skygrid():
-    tree = physherpy.physher.ReparameterizedTimeTreeModel(
+    tree = ReparameterizedTimeTreeModel(
         "(((A,B),C),D);", ['A', 'B', 'C', 'D'], [0.0, 0.0, 0.0, 0.0]
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
-    skyrgrid = physherpy.physher.PiecewiseConstantCoalescentGridModel(
+    skyrgrid = PiecewiseConstantCoalescentGridModel(
         [3.0, 10.0, 4.0, 2.0, 3.0], tree, 10.0
     )
     skyrgrid.request_gradient([flags.THETA, flags.TREE_HEIGHT])
@@ -100,7 +105,7 @@ def test_skygrid():
     ],
 )
 def test_skygrid_heterochronous(cutoff, expected, gradient):
-    tree = physherpy.physher.ReparameterizedTimeTreeModel(
+    tree = ReparameterizedTimeTreeModel(
         "((((A,B),C),D),E);", ['A', 'B', 'C', 'D', 'E'], [0.0, 1.0, 2.0, 3.0, 12.0]
     )
     lower = np.array([1.0, 2.0, 3.0, 12.0])
@@ -108,9 +113,7 @@ def test_skygrid_heterochronous(cutoff, expected, gradient):
     tree.set_parameters(np.array(ratios))
     thetas_log = np.array([1.0, 3.0, 6.0, 8.0, 9.0])
     thetas = np.exp(thetas_log)
-    skyrgrid = physherpy.physher.PiecewiseConstantCoalescentGridModel(
-        thetas, tree, cutoff
-    )
+    skyrgrid = PiecewiseConstantCoalescentGridModel(thetas, tree, cutoff)
     skyrgrid.request_gradient([flags.THETA, flags.TREE_HEIGHT])
     assert skyrgrid.log_likelihood() == pytest.approx(expected)
     np.testing.assert_allclose(
