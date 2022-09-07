@@ -18,7 +18,7 @@ class StrictClockModel(TStrictClockModel, Interface):
             self.inst.set_parameters(self._rates.tensor[index].detach().numpy())
 
 
-class SimpleClockModel(TStrictClockModel, Interface):
+class SimpleClockModel(TSimpleClockModel, Interface):
     def __init__(self, id_: ID, rates: AbstractParameter, tree) -> None:
         super().__init__(id_, rates, tree)
         self.inst = PhysherSimpleClockModel(rates.tensor.tolist(), tree.inst)

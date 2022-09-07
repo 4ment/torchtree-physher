@@ -1,10 +1,11 @@
+import numpy as np
 import torch
 from torchtree import TransformedParameter
 from torchtree.core.model import CallableModel
 from torchtree.core.utils import JSONParseError, process_object, string_to_list_index
 from torchtree.evolution.alignment import Alignment, Sequence, read_fasta_sequences
 from torchtree.evolution.branch_model import BranchModel
-from torchtree.evolution.site_model import SiteModel
+from torchtree.evolution.site_model import SiteModel, UnivariateDiscretizedSiteModel
 from torchtree.evolution.site_pattern import SitePattern
 from torchtree.evolution.substitution_model.abstract import SubstitutionModel
 from torchtree.evolution.tree_model import TreeModel
@@ -55,8 +56,10 @@ class TreeLikelihoodModel(CallableModel):
 
         clock_rate = None
         mu = None
-        weibull_shape = (
-            None if self.site_model.rates().shape[-1] == 1 else self.site_model.shape
+        site_parameter = (
+            self.site_model._parameter.tensor
+            if isinstance(self.site_model, UnivariateDiscretizedSiteModel)
+            else None
         )
 
         if self.site_model._mu is not None:
@@ -90,7 +93,7 @@ class TreeLikelihoodModel(CallableModel):
             clock_rate,
             subst_rates,
             subst_frequencies,
-            weibull_shape,
+            site_parameter,
             mu,
         )
 
@@ -169,7 +172,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         clock_rates=None,
         subst_rates=None,
         subst_frequencies=None,
-        weibull_shape=None,
+        site_parameter=None,
         mu=None,
     ) -> torch.Tensor:
         """Evaluate log tree likelihood using physher
@@ -182,7 +185,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         :param torch.Tensor clock_rates: substitution rate tensor
         :param torch.Tensor subst_rates: transition rate matrix biases tensor
         :param torch.Tensor subst_frequencies: frequencies of the transition rate matrix
-        :param torch.Tensor weibull_shape: shape tensor of the Weibull distribution
+        :param torch.Tensor site_parameter: shape tensor of the Weibull distribution
         :param torch.Tensor mu: mu tensor
         :return:
         """
@@ -192,7 +195,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             clock_rates,
             subst_rates,
             subst_frequencies,
-            weibull_shape,
+            site_parameter,
             mu,
         )
 
@@ -206,12 +209,14 @@ class TreeLikelihoodFunction(torch.autograd.Function):
                 physher_flags = [flags.TREE_HEIGHT]
                 if subst_rates is not None or subst_frequencies is not None:
                     physher_flags.append(flags.SUBSTITUTION_MODEL)
-                if weibull_shape is not None:
+                if site_parameter is not None:
                     physher_flags.append(flags.SITE_MODEL)
                 inst.request_gradient(physher_flags)
         # Unrooted tree
         elif clock_rates is None:
             rate_need_update = False
+
+        options = {'dtype': branch_lengths.dtype, 'device': branch_lengths.device}
 
         log_probs = []
         grads = []
@@ -222,11 +227,15 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             if rate_need_update:
                 models[3].update(i)
 
-            log_probs.append(torch.tensor([inst.log_likelihood()]))
+            log_probs.append(inst.log_likelihood())
             if branch_lengths.requires_grad:
-                grads.append(torch.tensor(inst.gradient()))
-        ctx.grads = torch.stack(grads) if branch_lengths.requires_grad else None
-        return torch.stack(log_probs)
+                grads.append(inst.gradient())
+        ctx.grads = (
+            torch.tensor(np.stack(grads), **options)
+            if branch_lengths.requires_grad
+            else None
+        )
+        return torch.tensor(log_probs, **options)
 
     @staticmethod
     def backward(ctx, grad_output) -> torch.Tensor:
@@ -247,7 +256,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             clock_rates,
             subst_rates,
             subst_frequencies,
-            weibull_shape,
+            site_parameter,
             mu,
         ) = ctx.saved_tensors
 
@@ -256,13 +265,13 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         ] * grad_output.unsqueeze(-1)
         offset = branch_lengths.shape[-1]
 
-        if weibull_shape is not None:
-            weibull_grad = ctx.grads[
-                ..., offset : (offset + weibull_shape.shape[-1])
+        if site_parameter is not None:
+            site_parameter_grad = ctx.grads[
+                ..., offset : (offset + site_parameter.shape[-1])
             ] * grad_output.unsqueeze(-1)
-            offset += weibull_shape.shape[-1]
+            offset += site_parameter.shape[-1]
         else:
-            weibull_grad = None
+            site_parameter_grad = None
 
         if mu is not None:
             mu_grad = ctx.grads[
@@ -303,6 +312,6 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             clock_rate_grad,
             subst_rates_grad,
             subst_frequencies_grad,
-            weibull_grad,
+            site_parameter_grad,
             mu_grad,
         )

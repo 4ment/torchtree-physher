@@ -148,19 +148,32 @@ PYBIND11_MODULE(physher, m) {
         return empty;
       });
 
-  py::class_<WeibullSiteModelInterface, SiteModelInterface>(m,
-                                                            "WeibullSiteModel")
-      .def(py::init<double, size_t, std::optional<double>>())
-      .def("set_shape", &WeibullSiteModelInterface::SetShape)
+  py::class_<DiscretizedSiteModelInterface, SiteModelInterface>(
+      m, "DiscretizedConstantSiteModel")
+      .def("set_proportion_invariant",
+           &DiscretizedSiteModelInterface::SetProportionInvariant)
       .def("set_parameters",
-           [](WeibullSiteModelInterface &self, double_np parameters) {
+           [](DiscretizedSiteModelInterface &self, double_np parameters) {
              self.SetParameters(parameters.data());
            })
-      .def("parameters", [](WeibullSiteModelInterface &self) {
+      .def("parameters", [](DiscretizedSiteModelInterface &self) {
         double_np parameters = double_np(self.parameterCount_);
         self.GetParameters(parameters.mutable_data());
         return parameters;
       });
+
+  py::class_<WeibullSiteModelInterface, DiscretizedSiteModelInterface>(
+      m, "WeibullSiteModel")
+      .def(py::init<double, size_t, std::optional<double>,
+                    std::optional<double>>())
+      .def("set_shape", &WeibullSiteModelInterface::SetShape);
+
+  py::class_<GammaSiteModelInterface, DiscretizedSiteModelInterface>(
+      m, "GammaSiteModel")
+      .def(py::init<double, size_t, std::optional<double>,
+                    std::optional<double>>())
+      .def("set_shape", &GammaSiteModelInterface::SetShape)
+      .def("set_epsilon", &GammaSiteModelInterface::SetEpsilon);
 
   py::class_<BranchModelInterface>(m, "BranchModelInterface")
       .def("parameters", [](BranchModelInterface &self) {
