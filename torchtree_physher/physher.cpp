@@ -144,8 +144,29 @@ PYBIND11_MODULE(physher, m) {
              self.SetParameters(parameters.data());
            })
       .def("parameters", [](ConstantSiteModelInterface &self) {
-        double_np empty;
-        return empty;
+        if (self.parameterCount_ == 0) {
+          double_np empty;
+          return empty;
+        } else {
+          double_np parameters = double_np(self.parameterCount_);
+          self.GetParameters(parameters.mutable_data());
+          return parameters;
+        }
+      });
+
+  py::class_<InvariantSiteModelInterface, SiteModelInterface>(
+      m, "InvariantSiteModel")
+      .def(py::init<double, std::optional<double>>())
+      .def("set_proportion_invariant",
+           &InvariantSiteModelInterface::SetProportionInvariant)
+      .def("set_parameters",
+           [](InvariantSiteModelInterface &self, double_np parameters) {
+             self.SetParameters(parameters.data());
+           })
+      .def("parameters", [](InvariantSiteModelInterface &self) {
+        double_np parameters = double_np(self.parameterCount_);
+        self.GetParameters(parameters.mutable_data());
+        return parameters;
       });
 
   py::class_<DiscretizedSiteModelInterface, SiteModelInterface>(

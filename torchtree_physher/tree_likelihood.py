@@ -62,6 +62,13 @@ class TreeLikelihoodModel(CallableModel):
             else None
         )
 
+        pinv = (
+            self.site_model._invariant.tensor
+            if hasattr(self.site_model, '_invariant')
+            and self.site_model._invariant is not None
+            else None
+        )
+
         if self.site_model._mu is not None:
             mu = self.site_model._mu.tensor
 
@@ -94,6 +101,7 @@ class TreeLikelihoodModel(CallableModel):
             subst_rates,
             subst_frequencies,
             site_parameter,
+            pinv,
             mu,
         )
 
@@ -173,6 +181,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         subst_rates=None,
         subst_frequencies=None,
         site_parameter=None,
+        pinv=None,
         mu=None,
     ) -> torch.Tensor:
         """Evaluate log tree likelihood using physher
@@ -186,6 +195,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         :param torch.Tensor subst_rates: transition rate matrix biases tensor
         :param torch.Tensor subst_frequencies: frequencies of the transition rate matrix
         :param torch.Tensor site_parameter: shape tensor of the Weibull distribution
+        :param torch.Tensor pinv: proportion of invariant site tensor
         :param torch.Tensor mu: mu tensor
         :return:
         """
@@ -196,6 +206,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             subst_rates,
             subst_frequencies,
             site_parameter,
+            pinv,
             mu,
         )
 
@@ -209,7 +220,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
                 physher_flags = [flags.TREE_HEIGHT]
                 if subst_rates is not None or subst_frequencies is not None:
                     physher_flags.append(flags.SUBSTITUTION_MODEL)
-                if site_parameter is not None:
+                if site_parameter is not None or pinv is not None or mu is not None:
                     physher_flags.append(flags.SITE_MODEL)
                 inst.request_gradient(physher_flags)
         # Unrooted tree
@@ -257,6 +268,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             subst_rates,
             subst_frequencies,
             site_parameter,
+            pinv,
             mu,
         ) = ctx.saved_tensors
 
@@ -272,6 +284,14 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             offset += site_parameter.shape[-1]
         else:
             site_parameter_grad = None
+
+        if pinv is not None:
+            pinv_grad = ctx.grads[
+                ..., offset : (offset + pinv.shape[-1])
+            ] * grad_output.unsqueeze(-1)
+            offset += pinv.shape[-1]
+        else:
+            pinv_grad = None
 
         if mu is not None:
             mu_grad = ctx.grads[
@@ -313,5 +333,6 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             subst_rates_grad,
             subst_frequencies_grad,
             site_parameter_grad,
+            pinv_grad,
             mu_grad,
         )

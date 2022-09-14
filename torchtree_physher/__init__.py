@@ -8,6 +8,7 @@ from torchtree_physher.ctmc_scale import CTMCScale
 from torchtree_physher.site_model import (
     ConstantSiteModel,
     GammaSiteModel,
+    InvariantSiteModel,
     WeibullSiteModel,
 )
 from torchtree_physher.substitution_model import GTR, HKY, JC69

@@ -4,6 +4,9 @@ from torchtree.core.utils import process_object
 from torchtree.evolution.site_model import (
     ConstantSiteModel as TorchtreeConstantSiteModel,
 )
+from torchtree.evolution.site_model import (
+    InvariantSiteModel as TorchtreeInvariantSiteModel,
+)
 from torchtree.evolution.site_model import UnivariateDiscretizedSiteModel
 from torchtree.evolution.site_model import WeibullSiteModel as TorchtreeWeibullSiteModel
 from torchtree.typing import ID
@@ -11,18 +14,33 @@ from torchtree.typing import ID
 from .interface import Interface
 from .physher import ConstantSiteModel as PhysherConstantSiteModel
 from .physher import GammaSiteModel as PhysherGammaSiteModel
+from .physher import InvariantSiteModel as PhysherInvariantSiteModel
 from .physher import WeibullSiteModel as PhysherWeibullSiteModel
 
 
 class ConstantSiteModel(TorchtreeConstantSiteModel, Interface):
     def __init__(self, id_: ID, mu: AbstractParameter = None) -> None:
         super().__init__(id_, mu)
-        mu_numpy = None if mu is None else mu.tensor.numpy()
-        self.inst = PhysherConstantSiteModel(mu_numpy)
+        mu_float = None if mu is None else mu.tensor.item()
+        self.inst = PhysherConstantSiteModel(mu_float)
 
     def update(self, index):
         if self._mu is not None:
             self.inst.set_mu(self._mu.tensor[index])
+
+
+class InvariantSiteModel(TorchtreeInvariantSiteModel, Interface):
+    def __init__(
+        self, id_: ID, invariant: AbstractParameter, mu: AbstractParameter = None
+    ) -> None:
+        super().__init__(id_, invariant, mu)
+        mu_float = None if mu is None else mu.tensor.item()
+        self.inst = PhysherInvariantSiteModel(invariant.tensor.item(), mu_float)
+
+    def update(self, index):
+        self.inst.set_proportion_invariant(self.invariant[index].item())
+        if self._mu is not None:
+            self.inst.set_mu(self._mu.tensor[index].item())
 
 
 class WeibullSiteModel(TorchtreeWeibullSiteModel, Interface):
@@ -35,10 +53,10 @@ class WeibullSiteModel(TorchtreeWeibullSiteModel, Interface):
         mu: AbstractParameter = None,
     ) -> None:
         super().__init__(id_, shape, categories, invariant, mu)
-        mu_numpy = None if mu is None else mu.tensor.numpy()
-        invariant_numpy = None if invariant is None else invariant.tensor.numpy()
+        mu_float = None if mu is None else mu.tensor.item()
+        invariant_float = None if invariant is None else invariant.tensor.item()
         self.inst = PhysherWeibullSiteModel(
-            shape.tensor.tolist()[0], categories, invariant_numpy, mu_numpy
+            shape.tensor.item(), categories, invariant_float, mu_float
         )
 
     def update(self, index):
@@ -59,10 +77,10 @@ class GammaSiteModel(UnivariateDiscretizedSiteModel, Interface):
         mu: AbstractParameter = None,
     ) -> None:
         super().__init__(id_, shape, categories, invariant, mu)
-        mu_numpy = None if mu is None else mu.tensor.numpy()
-        invariant_numpy = None if invariant is None else invariant.tensor.numpy()
+        mu_float = None if mu is None else mu.tensor.item()
+        invariant_float = None if invariant is None else invariant.tensor.item()
         self.inst = PhysherGammaSiteModel(
-            shape.tensor.tolist()[0], categories, invariant_numpy, mu_numpy
+            shape.tensor.item(), categories, invariant_float, mu_float
         )
 
     @property

@@ -1,9 +1,9 @@
 def process_tree_likelihood(arg, json_tree_likelihood):
-    json_tree_likelihood['type'] = 'torchree_physher.' + json_tree_likelihood['type']
+    json_tree_likelihood['type'] = 'torchtree_physher.' + json_tree_likelihood['type']
 
     for model in ('tree_model', 'site_model', 'substitution_model'):
         json_tree_likelihood[model]['type'] = (
-            'torchree_physher.' + json_tree_likelihood[model]['type']
+            'torchtree_physher.' + json_tree_likelihood[model]['type']
         )
     if arg.clock is not None:
         json_tree_likelihood['branch_model']['type'] = (
@@ -19,4 +19,4 @@ def process_coalescent(arg, json_coalescent):
         'PiecewiseConstantCoalescentGridModel',
         'PiecewiseConstantCoalescentModel',
     ):
-        json_coalescent['type'] = 'torchree_physher.' + json_coalescent['type']
+        json_coalescent['type'] = 'torchtree_physher.' + json_coalescent['type']
