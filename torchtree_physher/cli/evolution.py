@@ -7,7 +7,7 @@ def process_tree_likelihood(arg, json_tree_likelihood):
         )
     if arg.clock is not None:
         json_tree_likelihood['branch_model']['type'] = (
-            'torchree_physher.' + json_tree_likelihood['branch_model']['type']
+            'torchtree_physher.' + json_tree_likelihood['branch_model']['type']
         )
     if 'include_jacobian' in arg and arg.include_jacobian:
         json_tree_likelihood['include_jacobian'] = True
