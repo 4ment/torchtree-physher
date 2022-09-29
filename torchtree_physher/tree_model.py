@@ -49,7 +49,7 @@ class NodeHeightAutogradFunction(torch.autograd.Function):
             node_heights.append(torch.tensor(inst.get_node_heights()))
 
         node_heights = torch.stack(node_heights)
-        if len(ratios_root_height.shape) != node_heights.shape:
+        if ratios_root_height.shape != node_heights.shape:
             node_heights = node_heights.view(ratios_root_height.shape)
         if ratios_root_height.requires_grad:
             ctx.save_for_backward(node_heights)
@@ -93,9 +93,11 @@ class NodeHeightJacobianAutogradFunction(torch.autograd.Function):
             log_probs.append(torch.tensor([inst.transform_jacobian()]))
             if ratios_root_height.requires_grad:
                 grads.append(torch.tensor(inst.gradient_transform_jacobian()))
-
+        log_probs = torch.concat(log_probs, -1)
+        if ratios_root_height.dim() > 2:
+            log_probs = log_probs.view(ratios_root_height.shape[:-1] + (1,))
         ctx.grads = torch.stack(grads) if ratios_root_height.requires_grad else None
-        return torch.stack(log_probs)
+        return log_probs
 
     @staticmethod
     def backward(ctx, grad_output):
@@ -113,7 +115,8 @@ class UnRootedTreeModel(TUnRootedTreeModel, Interface):
         )
 
     def update(self, index):
-        self.inst.set_parameters(self._branch_lengths.tensor[index].detach().numpy())
+        tensor_flatten = flatten_2D(self._branch_lengths.tensor)
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())
 
 
 class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
@@ -132,7 +135,8 @@ class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
         self.zero_jacobian = False
 
     def update(self, index):
-        self.inst.set_parameters(self._internal_heights.tensor[index].detach().numpy())
+        tensor_flatten = flatten_2D(self._internal_heights.tensor)
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
         if self.zero_jacobian:

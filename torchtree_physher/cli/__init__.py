@@ -12,8 +12,8 @@ class Physher(Plugin):
             parser.add_argument(
                 '--physher_include_jacobian',
                 action="store_true",
-                help="""include Jacobian of the node height transform 
-                in the node height gradient""",
+                help="include Jacobian of the node height transform in "
+                "the node height gradient",
             )
             parser.add_argument(
                 '--physher_site',

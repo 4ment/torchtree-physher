@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torchtree.evolution.coalescent
 from torchtree.core.abstractparameter import AbstractParameter
@@ -12,6 +14,7 @@ from .physher import (
     PiecewiseConstantCoalescentModel as PhysherPiecewiseConstantCoalescentModel,
 )
 from .physher import ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel
+from .utils import flatten_2D
 
 
 def evaluate_coalescent(
@@ -38,13 +41,16 @@ class ConstantCoalescentModel(
         tree_model,
     ) -> None:
         super().__init__(id_, theta, tree_model)
-        self.inst = PhysherConstantCoalescentModel(theta.tensor.item(), tree_model.inst)
+        self.inst = PhysherConstantCoalescentModel(
+            flatten_2D(theta.tensor)[0].item(), tree_model.inst
+        )
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
         return evaluate_coalescent(self.inst, self, self.tree_model)
 
     def update(self, index):
-        self.inst.set_parameters(self.theta.tensor[index].detach().numpy())
+        tensor_flatten = flatten_2D(self.theta.tensor)
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())
 
 
 class PiecewiseConstantCoalescentModel(
@@ -58,14 +64,15 @@ class PiecewiseConstantCoalescentModel(
     ) -> None:
         super().__init__(id_, theta, tree_model)
         self.inst = PhysherPiecewiseConstantCoalescentModel(
-            theta.tensor.tolist(), tree_model.inst
+            flatten_2D(theta.tensor)[0].tolist(), tree_model.inst
         )
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
         return evaluate_coalescent(self.inst, self, self.tree_model)
 
     def update(self, index):
-        self.inst.set_parameters(self.theta.tensor[index].detach().numpy())
+        tensor_flatten = flatten_2D(self.theta.tensor)
+        self.inst.set_parameters(tensor_flatten.detach().numpy())
 
 
 class PiecewiseConstantCoalescentGridModel(
@@ -80,14 +87,17 @@ class PiecewiseConstantCoalescentGridModel(
     ) -> None:
         super().__init__(id_, theta, grid, tree_model)
         self.inst = PhysherPiecewiseConstantCoalescentGridModel(
-            theta.tensor.tolist(), tree_model.inst, grid.tensor[-1].item()
+            flatten_2D(theta.tensor)[0].tolist(),
+            tree_model.inst,
+            grid.tensor[-1].item(),
         )
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
         return evaluate_coalescent(self.inst, self, self.tree_model)
 
     def update(self, index):
-        self.inst.set_parameters(self.theta.tensor[index].detach().numpy())
+        tensor_flatten = flatten_2D(self.theta.tensor)
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())
 
 
 class CoalescentAutogradFunction(torch.autograd.Function):
@@ -104,14 +114,16 @@ class CoalescentAutogradFunction(torch.autograd.Function):
 
         log_probs = []
         grads = []
-        for i in range(thetas.shape[0]):
+        dim = 1 if thetas.dim() == 1 else math.prod(thetas.shape[:-1])
+
+        for i in range(dim):
             for model in models:
                 model.update(i)
             log_probs.append(torch.tensor([inst.log_likelihood()]))
             if thetas.requires_grad:
                 grads.append(torch.tensor(inst.gradient()))
         ctx.grads = torch.stack(grads) if thetas.requires_grad else None
-        return torch.stack(log_probs)
+        return torch.concat(log_probs, -1).view(thetas.shape[:-1] + (1,))
 
     @staticmethod
     def backward(ctx, grad_output):

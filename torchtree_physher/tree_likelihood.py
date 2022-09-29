@@ -243,7 +243,10 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             if branch_lengths.requires_grad
             else None
         )
-        return torch.tensor(log_probs, **options)
+        log_probs = torch.tensor(log_probs, **options)
+        if branch_lengths.dim() > 2:
+            log_probs = log_probs.view(branch_lengths.shape[:-1] + (1,))
+        return log_probs
 
     @staticmethod
     def backward(ctx, grad_output) -> torch.Tensor:
