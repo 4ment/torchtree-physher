@@ -43,7 +43,7 @@ PYBIND11_MODULE(physher, m) {
   py::class_<ReparameterizedTimeTreeModelInterface, TreeModelInterface>(
       m, "ReparameterizedTimeTreeModel")
       .def(py::init<const std::string &, const std::vector<std::string> &,
-                    const std::vector<double>>())
+                    const std::vector<double>, TreeTransformFlags>())
       .def("set_parameters",
            [](ReparameterizedTimeTreeModelInterface &self,
               double_np parameters) { self.SetParameters(parameters.data()); })
@@ -217,6 +217,10 @@ PYBIND11_MODULE(physher, m) {
       .def("set_parameters",
            [](SimpleClockModelInterface &self, double_np parameters) {
              self.SetParameters(parameters.data());
+           })
+      .def("set_rates",
+           [](SimpleClockModelInterface &self, double_np parameters) {
+             return self.SetRates(parameters.data());
            });
 
   py::class_<CoalescentModelInterface>(m, "CoalescentModelInterface")
@@ -293,5 +297,13 @@ PYBIND11_MODULE(physher, m) {
              "gradient of substitution model parameters")
       .value("BRANCH_MODEL", TreeLikelihoodGradientFlags::BRANCH_MODEL,
              "gradient of branch model parameters")
+      .export_values();
+
+  py::module tree_transform_flags = m.def_submodule("tree_transform_flags");
+  py::enum_<TreeTransformFlags>(tree_transform_flags, "tree_transform_flags")
+      .value("RATIO", TreeTransformFlags::RATIO,
+             "tree transform using ratio parameterization")
+      .value("SHIFT", TreeTransformFlags::SHIFT,
+             "tree transform using shift parameterization")
       .export_values();
 }
