@@ -17,6 +17,10 @@ PYBIND11_MODULE(physher, m) {
                     TreeModelInterface *, SubstitutionModelInterface *,
                     SiteModelInterface *, std::optional<BranchModelInterface *>,
                     bool, bool, bool>())
+      .def(py::init<const std::vector<std::string> &,
+                    const std::vector<std::string> &, TreeModelInterface *,
+                    SubstitutionModelInterface *, SiteModelInterface *,
+                    std::optional<BranchModelInterface *>, bool, bool, bool>())
       .def("log_likelihood", &TreeLikelihoodInterface::LogLikelihood)
       .def("gradient",
            [](TreeLikelihoodInterface &self) {
@@ -133,6 +137,33 @@ PYBIND11_MODULE(physher, m) {
         self.GetParameters(parameters.mutable_data());
         return parameters;
       });
+
+  py::class_<GeneralSubstitutionModelInterface, SubstitutionModelInterface>(
+      m, "GeneralSubstitutionModel")
+      .def(py::init<DataTypeInterface *, const std::vector<double> &,
+                    const std::vector<double> &, const std::vector<unsigned> &,
+                    bool>())
+      .def("set_rates",
+           [](GeneralSubstitutionModelInterface &self, double_np parameters) {
+             return self.SetRates(parameters.data());
+           })
+      .def("set_frequencies",
+           [](GeneralSubstitutionModelInterface &self, double_np parameters) {
+             return self.SetFrequencies(parameters.data());
+           })
+      .def("set_parameters",
+           [](GeneralSubstitutionModelInterface &self, double_np parameters) {
+             self.SetParameters(parameters.data());
+           })
+      .def("parameters", [](GeneralSubstitutionModelInterface &self) {
+        double_np parameters = double_np(self.parameterCount_);
+        self.GetParameters(parameters.mutable_data());
+        return parameters;
+      });
+
+  py::class_<DataTypeInterface>(m, "DataTypeInterface");
+  py::class_<GeneralDataTypeInterface, DataTypeInterface>(m, "GeneralDataType")
+      .def(py::init<const std::vector<std::string> &>());
 
   py::class_<SiteModelInterface>(m, "SiteModelInterface")
       .def("set_mu", &ConstantSiteModelInterface::SetMu);
@@ -294,7 +325,13 @@ PYBIND11_MODULE(physher, m) {
              "gradient of site model parameters")
       .value("SUBSTITUTION_MODEL",
              TreeLikelihoodGradientFlags::SUBSTITUTION_MODEL,
-             "gradient of substitution model parameters")
+             "gradient of all parameters in substitution model")
+      .value("SUBSTITUTION_MODEL_RATES",
+             TreeLikelihoodGradientFlags::SUBSTITUTION_MODEL_RATES,
+             "gradient of rate parameters in substitution model")
+      .value("SUBSTITUTION_MODEL_FREQUENCIES",
+             TreeLikelihoodGradientFlags::SUBSTITUTION_MODEL_FREQUENCIES,
+             "gradient of frequcencies parameters in substitution model")
       .value("BRANCH_MODEL", TreeLikelihoodGradientFlags::BRANCH_MODEL,
              "gradient of branch model parameters")
       .export_values();

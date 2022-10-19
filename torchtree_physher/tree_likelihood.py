@@ -37,16 +37,28 @@ class TreeLikelihoodModel(CallableModel):
         self.clock_model = clock_model
         clock_inst = clock_model.inst if clock_model is not None else None
 
-        self.inst = PhysherTreeLikelihood(
-            alignment,
-            tree_model.inst,
-            subst_model.inst,
-            site_model.inst,
-            clock_inst,
-            use_ambiguities,
-            use_tip_states,
-            include_jacobian,
-        )
+        if isinstance(alignment, tuple):
+            self.inst = PhysherTreeLikelihood(
+                *alignment,
+                tree_model.inst,
+                subst_model.inst,
+                site_model.inst,
+                clock_inst,
+                use_ambiguities,
+                use_tip_states,
+                include_jacobian,
+            )
+        else:
+            self.inst = PhysherTreeLikelihood(
+                alignment,
+                tree_model.inst,
+                subst_model.inst,
+                site_model.inst,
+                clock_inst,
+                use_ambiguities,
+                use_tip_states,
+                include_jacobian,
+            )
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
         fn = TreeLikelihoodFunction.apply
@@ -87,7 +99,9 @@ class TreeLikelihoodModel(CallableModel):
             self.subst_model._rates, TransformedParameter
         ):
             subst_rates = self.subst_model._rates.tensor
-        elif hasattr(self.subst_model, '_kappa'):
+        elif hasattr(self.subst_model, '_kappa') and isinstance(
+            self.subst_model._kappa, TransformedParameter
+        ):
             subst_rates = self.subst_model.kappa
 
         return fn(
@@ -116,10 +130,37 @@ class TreeLikelihoodModel(CallableModel):
         site_model = process_object(data[SiteModel.tag], dic)
         subst_model = process_object(data[SubstitutionModel.tag], dic)
 
+        use_ambiguities = data.get('use_ambiguities', False)
+        use_tip_states = data.get('use_tip_states', False)
+        include_jacobian = data.get('include_jacobian', False)
+
+        clock_model = None
+        if BranchModel.tag in data:
+            clock_model = process_object(data[BranchModel.tag], dic)
+            tree_model.zero_jacobian = include_jacobian
+
         # Ignore site_pattern and parse alignment instead
 
+        if data[SitePattern.tag]['type'] == 'torchtree_physher.AttributePattern':
+            taxa = process_object(data[SitePattern.tag]['taxa'], dic)
+            attribute_name = data[SitePattern.tag]['attribute']
+            taxon_list = [taxon.id for taxon in taxa]
+            attribute_list = [taxon[attribute_name] for taxon in taxa]
+
+            return cls(
+                id_,
+                (taxon_list, attribute_list),
+                tree_model,
+                subst_model,
+                site_model,
+                clock_model,
+                use_ambiguities,
+                use_tip_states,
+                include_jacobian,
+            )
+
         # alignment is a reference to an object already parsed
-        if isinstance(data[SitePattern.tag]['alignment'], str):
+        elif isinstance(data[SitePattern.tag]['alignment'], str):
             alignment = dic[data[SitePattern.tag]['alignment']]
         # alignment contains a file entry
         elif 'file' in data[SitePattern.tag]['alignment']:
@@ -144,15 +185,6 @@ class TreeLikelihoodModel(CallableModel):
                     Sequence(alignment[idx].taxon, seq)
                     for idx, seq in enumerate(sequences_new)
                 ]
-
-        use_ambiguities = data.get('use_ambiguities', False)
-        use_tip_states = data.get('use_tip_states', False)
-        include_jacobian = data.get('include_jacobian', False)
-
-        clock_model = None
-        if BranchModel.tag in data:
-            clock_model = process_object(data[BranchModel.tag], dic)
-            tree_model.zero_jacobian = include_jacobian
 
         return cls(
             id_,
@@ -208,18 +240,28 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         )
 
         rate_need_update = True
+        physher_flags = []
+        if branch_lengths.requires_grad:
+            physher_flags.append(flags.TREE_HEIGHT)
+        if clock_rates is not None and clock_rates.requires_grad:
+            physher_flags.append(flags.BRANCH_MODEL)
+        if subst_rates is not None and subst_rates.requires_grad:
+            physher_flags.append(flags.SUBSTITUTION_MODEL_RATES)
+        if subst_frequencies is not None and subst_frequencies.requires_grad:
+            physher_flags.append(flags.SUBSTITUTION_MODEL_FREQUENCIES)
+        if (
+            (site_parameter is not None and site_parameter.requires_grad)
+            or (pinv is not None and pinv.requires_grad)
+            or (mu is not None and mu.requires_grad)
+        ):
+            physher_flags.append(flags.SITE_MODEL)
+        if len(physher_flags) > 0:
+            inst.request_gradient(physher_flags)
+
         # Fixed clock rate
         if clock_rates is not None and clock_rates.dim() == 1:
             models[3].update(0)
             rate_need_update = False
-
-            if branch_lengths.requires_grad and not clock_rates.requires_grad:
-                physher_flags = [flags.TREE_HEIGHT]
-                if subst_rates is not None or subst_frequencies is not None:
-                    physher_flags.append(flags.SUBSTITUTION_MODEL)
-                if site_parameter is not None or pinv is not None or mu is not None:
-                    physher_flags.append(flags.SITE_MODEL)
-                inst.request_gradient(physher_flags)
         # Unrooted tree
         elif clock_rates is None:
             rate_need_update = False

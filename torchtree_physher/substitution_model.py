@@ -1,4 +1,9 @@
+import torch
 from torchtree.core.abstractparameter import AbstractParameter
+from torchtree.evolution.datatype import DataType
+from torchtree.evolution.substitution_model.general import (
+    GeneralNonSymmetricSubstitutionModel as TGeneralNonSymmetricSubstitutionModel,
+)
 from torchtree.evolution.substitution_model.nucleotide import GTR as TGTR
 from torchtree.evolution.substitution_model.nucleotide import HKY as THKY
 from torchtree.evolution.substitution_model.nucleotide import JC69 as TJC69
@@ -8,6 +13,7 @@ from .interface import Interface
 from .physher import GTR as PhysherGTR
 from .physher import HKY as PhysherHKY
 from .physher import JC69 as PhysherJC69
+from .physher import GeneralSubstitutionModel as PhysherGeneralSubstitutionModel
 from .utils import flatten_2D
 
 
@@ -52,3 +58,43 @@ class GTR(TGTR, Interface):
         frequencies_flatten = flatten_2D(self._frequencies.tensor)
         self.inst.set_rates(rates_flatten[index])
         self.inst.set_frequencies(frequencies_flatten[index])
+
+
+class GeneralNonSymmetricSubstitutionModel(
+    TGeneralNonSymmetricSubstitutionModel, Interface
+):
+    def __init__(
+        self,
+        id_: ID,
+        data_type: DataType,
+        mapping: AbstractParameter,
+        rates: AbstractParameter,
+        frequencies: AbstractParameter,
+        normalize: bool,
+    ) -> None:
+        super().__init__(id_, data_type, mapping, rates, frequencies, normalize)
+        rates_flatten = flatten_2D(self._rates.tensor)
+        frequencies_flatten = flatten_2D(self._frequencies.tensor)
+        physher_mapping = torch.zeros(
+            (self.state_count, self.state_count), dtype=torch.long
+        )
+        triu_indices = torch.triu_indices(
+            row=self.state_count, col=self.state_count, offset=1
+        )
+        dim = int(mapping.tensor.shape[-1] / 2)
+        physher_mapping[..., triu_indices[0], triu_indices[1]] = mapping.tensor[:dim]
+        physher_mapping[..., triu_indices[1], triu_indices[0]] = mapping.tensor[dim:]
+        self.inst = PhysherGeneralSubstitutionModel(
+            data_type.inst,
+            rates_flatten[0].tolist(),
+            frequencies_flatten[0].tolist(),
+            torch.flatten(physher_mapping).tolist(),
+            normalize,
+        )
+
+    def update(self, index):
+        rates_flatten = flatten_2D(self._rates.tensor)
+        frequencies_flatten = flatten_2D(self._frequencies.tensor)
+        self.inst.set_rates(rates_flatten[index])
+        if index < frequencies_flatten.shape[0]:
+            self.inst.set_frequencies(frequencies_flatten[index])
