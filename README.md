@@ -8,6 +8,17 @@ torchtree-physher is a package providing fast gradient calculation implemented i
 
 ## Installation
 
+```bash
+git clone https://github.com/4ment/physher
+cmake -B physher/build -DBUILD_CPP_WRAPPER=on -DBUILD_TESTING=on
+cmake --build physher/build/ --target install
+```
+
+Check it works (optional)
+```bash
+ctest --test-dir physher/build/
+```
+
 ### Get the source code
 ```bash
 git clone https://github.com/4ment/torchtree-physher
@@ -48,7 +59,7 @@ Some types in the JSON configuration file have to be replaced in order to use th
   - `ConstantSiteModel`
   - `WeibullSiteModel`
 
-Note that the type of every sub-model of the tree likelihood object (e.g. site, tree models...) has to replaced.
+Note that the type of every sub-model of the tree likelihood object (e.g. site, tree models...) has to be replaced.
 
 For example if we want to use ADVI with an unrooted tree and a Weibull site model:
 

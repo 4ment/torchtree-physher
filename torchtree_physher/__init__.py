@@ -5,7 +5,7 @@ from torchtree_physher.coalescent import (
     PiecewiseConstantCoalescentModel,
 )
 from torchtree_physher.ctmc_scale import CTMCScale
-from torchtree_physher.data_type import GeneralDataType
+from torchtree_physher.data_type import GeneralDataType, NucleotideDataType
 from torchtree_physher.site_model import (
     ConstantSiteModel,
     GammaSiteModel,

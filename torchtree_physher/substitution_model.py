@@ -1,4 +1,3 @@
-import torch
 from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.evolution.datatype import DataType
 from torchtree.evolution.substitution_model.general import (
@@ -75,20 +74,11 @@ class GeneralNonSymmetricSubstitutionModel(
         super().__init__(id_, data_type, mapping, rates, frequencies, normalize)
         rates_flatten = flatten_2D(self._rates.tensor)
         frequencies_flatten = flatten_2D(self._frequencies.tensor)
-        physher_mapping = torch.zeros(
-            (self.state_count, self.state_count), dtype=torch.long
-        )
-        triu_indices = torch.triu_indices(
-            row=self.state_count, col=self.state_count, offset=1
-        )
-        dim = int(mapping.tensor.shape[-1] / 2)
-        physher_mapping[..., triu_indices[0], triu_indices[1]] = mapping.tensor[:dim]
-        physher_mapping[..., triu_indices[1], triu_indices[0]] = mapping.tensor[dim:]
         self.inst = PhysherGeneralSubstitutionModel(
             data_type.inst,
             rates_flatten[0].tolist(),
             frequencies_flatten[0].tolist(),
-            torch.flatten(physher_mapping).tolist(),
+            mapping.tensor.tolist(),
             normalize,
         )
 

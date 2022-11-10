@@ -164,6 +164,9 @@ PYBIND11_MODULE(physher, m) {
   py::class_<DataTypeInterface>(m, "DataTypeInterface");
   py::class_<GeneralDataTypeInterface, DataTypeInterface>(m, "GeneralDataType")
       .def(py::init<const std::vector<std::string> &>());
+  py::class_<NucleotideDataTypeInterface, DataTypeInterface>(
+      m, "NucleotideDataType")
+      .def(py::init<>());
 
   py::class_<SiteModelInterface>(m, "SiteModelInterface")
       .def("set_mu", &ConstantSiteModelInterface::SetMu);
