@@ -28,6 +28,7 @@ class TreeLikelihoodModel(CallableModel):
         clock_model: BranchModel = None,
         use_ambiguities=False,
         use_tip_states=False,
+        use_sse=True,
         include_jacobian=False,
     ):
         super().__init__(id_)
@@ -59,6 +60,8 @@ class TreeLikelihoodModel(CallableModel):
                 use_tip_states,
                 include_jacobian,
             )
+        if not use_sse:
+            self.inst.enable_sse(use_sse)
 
     def _call(self, *args, **kwargs) -> torch.Tensor:
         fn = TreeLikelihoodFunction.apply
@@ -132,6 +135,7 @@ class TreeLikelihoodModel(CallableModel):
 
         use_ambiguities = data.get('use_ambiguities', False)
         use_tip_states = data.get('use_tip_states', False)
+        use_sse = data.get('use_sse', True)
         include_jacobian = data.get('include_jacobian', False)
 
         clock_model = None
@@ -195,6 +199,7 @@ class TreeLikelihoodModel(CallableModel):
             clock_model,
             use_ambiguities,
             use_tip_states,
+            use_sse,
             include_jacobian,
         )
 

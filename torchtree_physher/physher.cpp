@@ -28,7 +28,8 @@ PYBIND11_MODULE(physher, m) {
              self.Gradient(gradient.mutable_data());
              return gradient;
            })
-      .def("request_gradient", &TreeLikelihoodInterface::RequestGradient);
+      .def("request_gradient", &TreeLikelihoodInterface::RequestGradient)
+      .def("enable_sse", &TreeLikelihoodInterface::EnableSSE);
 
   py::class_<TreeModelInterface>(m, "TreeModelInterface");
   py::class_<UnRootedTreeModelInterface, TreeModelInterface>(
@@ -163,7 +164,9 @@ PYBIND11_MODULE(physher, m) {
 
   py::class_<DataTypeInterface>(m, "DataTypeInterface");
   py::class_<GeneralDataTypeInterface, DataTypeInterface>(m, "GeneralDataType")
-      .def(py::init<const std::vector<std::string> &>());
+      .def(py::init<const std::vector<std::string> &,
+                    std::optional<const std::map<std::string,
+                                                 std::vector<std::string>>>>());
   py::class_<NucleotideDataTypeInterface, DataTypeInterface>(
       m, "NucleotideDataType")
       .def(py::init<>());
