@@ -1,4 +1,5 @@
-import math
+import operator
+from functools import reduce
 
 import torch
 import torchtree.evolution.coalescent
@@ -114,7 +115,7 @@ class CoalescentAutogradFunction(torch.autograd.Function):
 
         log_probs = []
         grads = []
-        dim = 1 if thetas.dim() == 1 else math.prod(thetas.shape[:-1])
+        dim = reduce(operator.mul, thetas.shape[:-1], 1)
 
         for i in range(dim):
             for model in models:

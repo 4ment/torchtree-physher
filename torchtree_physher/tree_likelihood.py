@@ -283,13 +283,9 @@ class TreeLikelihoodFunction(torch.autograd.Function):
                 models[3].update(i)
 
             log_probs.append(inst.log_likelihood())
-            if branch_lengths.requires_grad:
+            if len(physher_flags) > 0:
                 grads.append(inst.gradient())
-        ctx.grads = (
-            torch.tensor(np.stack(grads), **options)
-            if branch_lengths.requires_grad
-            else None
-        )
+        ctx.grads = torch.tensor(np.stack(grads), **options) if len(grads) > 0 else None
         log_probs = torch.tensor(log_probs, **options)
         if branch_lengths.dim() > 2:
             log_probs = log_probs.view(branch_lengths.shape[:-1] + (1,))
@@ -319,64 +315,30 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             mu,
         ) = ctx.saved_tensors
 
-        branch_grad = ctx.grads[
-            ..., : branch_lengths.shape[-1]
-        ] * grad_output.unsqueeze(-1)
-        offset = branch_lengths.shape[-1]
+        def extract_grad(param, offset):
+            if param is not None and param.requires_grad:
+                branch_grad = ctx.grads[..., : param.shape[-1]] * grad_output.unsqueeze(
+                    -1
+                )
+                offset += param.shape[-1]
+            else:
+                branch_grad = None
+            return branch_grad, offset
 
-        if site_parameter is not None:
-            site_parameter_grad = ctx.grads[
-                ..., offset : (offset + site_parameter.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += site_parameter.shape[-1]
-        else:
-            site_parameter_grad = None
-
-        if pinv is not None:
-            pinv_grad = ctx.grads[
-                ..., offset : (offset + pinv.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += pinv.shape[-1]
-        else:
-            pinv_grad = None
-
-        if mu is not None:
-            mu_grad = ctx.grads[
-                ..., offset : (offset + mu.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += mu.shape[-1]
-        else:
-            mu_grad = None
-
-        if clock_rates is not None:
-            clock_rate_grad = ctx.grads[
-                ..., offset : (offset + clock_rates.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += clock_rates.shape[-1]
-        else:
-            clock_rate_grad = None
-
-        if subst_rates is not None:
-            subst_rates_grad = ctx.grads[
-                ..., offset : (offset + subst_rates.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += subst_rates.shape[-1]
-        else:
-            subst_rates_grad = None
-
-        if subst_frequencies is not None:
-            subst_frequencies_grad = ctx.grads[
-                ..., offset : (offset + subst_frequencies.shape[-1])
-            ] * grad_output.unsqueeze(-1)
-            offset += subst_frequencies.shape[-1]
-        else:
-            subst_frequencies_grad = None
+        offset = 0
+        branch_grad, offset = extract_grad(branch_lengths, offset)
+        site_parameter_grad, offset = extract_grad(site_parameter, offset)
+        pinv_grad, offset = extract_grad(pinv, offset)
+        mu_grad, offset = extract_grad(mu, offset)
+        clock_rates_grad, offset = extract_grad(clock_rates, offset)
+        subst_rates_grad, offset = extract_grad(subst_rates, offset)
+        subst_frequencies_grad, offset = extract_grad(subst_frequencies, offset)
 
         return (
             None,  # inst
             None,  # models
             branch_grad,
-            clock_rate_grad,
+            clock_rates_grad,
             subst_rates_grad,
             subst_frequencies_grad,
             site_parameter_grad,

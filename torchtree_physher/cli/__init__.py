@@ -16,6 +16,11 @@ class Physher(Plugin):
                 "the node height gradient",
             )
             parser.add_argument(
+                '--physher_disable_sse',
+                action="store_true",
+                help="disable SSE in physher",
+            )
+            parser.add_argument(
                 '--physher_site',
                 choices=['weibull', 'gamma'],
                 help="""distribution for rate heterogeneity across sites""",
@@ -48,14 +53,21 @@ class Physher(Plugin):
                 json_tree_likelihood['branch_model']['type'] = (
                     'torchtree_physher.' + json_tree_likelihood['branch_model']['type']
                 )
-            if 'physher_include_jacobian' in arg and arg.include_jacobian:
+            if arg.physher_include_jacobian:
                 json_tree_likelihood['include_jacobian'] = True
+
+            if arg.physher_disable_sse:
+                json_tree_likelihood['use_sse'] = False
 
     def process_coalescent(self, arg, json_coalescent):
         if arg.physher and isinstance(json_coalescent, dict):
-            if json_coalescent['type'] in (
-                'ConstantCoalescentModel',
-                'PiecewiseConstantCoalescentGridModel',
-                'PiecewiseConstantCoalescentModel',
+            if (
+                json_coalescent['type']
+                in (
+                    'ConstantCoalescentModel',
+                    'PiecewiseConstantCoalescentGridModel',
+                    'PiecewiseConstantCoalescentModel',
+                )
+                and arg.coalescent_temperature is None
             ):
                 json_coalescent['type'] = 'torchtree_physher.' + json_coalescent['type']
