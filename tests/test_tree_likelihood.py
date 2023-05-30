@@ -59,7 +59,7 @@ def test_unrooted(newick, use_tip_states):
 
 
 def test_unrooted_weibull():
-    m = WeibullSiteModel(0.1, 4, None)
+    m = WeibullSiteModel(0.1, 4, None, None)
     sm = JC69()
     tree = UnRootedTreeModel("(A:0.1,(B:0.1,C:0.2):0.1);", ['A', 'B', 'C'])
     use_ambiguities = True

@@ -1,0 +1,50 @@
+name: Testing (Linux)
+
+on: [push]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.7, 3.8, 3.9, '3.10', '3.11']
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install GSL
+      run: sudo apt-get install -y libgsl0-dev
+    - name: Checkout physher
+      uses: actions/checkout@v3
+      with:
+        repository: 4ment/physher
+        path: physher
+    - name: Install physher
+      run: |
+        cmake -S physher/ -B physher/build -DBUILD_CPP_WRAPPER=on -DBUILD_TESTING=on
+        sudo cmake --build physher/build/ --target install
+    - name: Checkout torchtree
+      uses: actions/checkout@v3
+      with:
+        repository: 4ment/torchtree
+        path: torchtree
+    - name: Install torchtree
+      run: |
+        python -m pip install --upgrade pip
+        pip install torchtree/
+    - name: Checkout torchtree-physher
+      uses: actions/checkout@v3
+      with:
+        path:
+          torchtree-physher
+    - name: Install torchtree-physher
+      working-directory: torchtree-physher
+      run: |
+        pip install .[test]
+    - name: Test with pytest
+      working-directory: torchtree-physher
+      run: |
+        pytest

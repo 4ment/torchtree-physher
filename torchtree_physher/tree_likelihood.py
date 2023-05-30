@@ -317,13 +317,13 @@ class TreeLikelihoodFunction(torch.autograd.Function):
 
         def extract_grad(param, offset):
             if param is not None and param.requires_grad:
-                branch_grad = ctx.grads[..., : param.shape[-1]] * grad_output.unsqueeze(
-                    -1
-                )
+                param_grad = ctx.grads[
+                    ..., offset : offset + param.shape[-1]
+                ] * grad_output.unsqueeze(-1)
                 offset += param.shape[-1]
             else:
-                branch_grad = None
-            return branch_grad, offset
+                param_grad = None
+            return param_grad, offset
 
         offset = 0
         branch_grad, offset = extract_grad(branch_lengths, offset)

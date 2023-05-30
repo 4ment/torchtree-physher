@@ -1,5 +1,7 @@
 # torchtree-physher
 
+[![Testing (Linux)](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml/badge.svg)](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml)
+
 torchtree-physher is a package providing fast gradient calculation implemented in [physher] for [torchtree]
 
 ## Dependencies

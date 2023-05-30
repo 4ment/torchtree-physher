@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from torchtree_physher.physher import CTMCScaleModel, ReparameterizedTimeTreeModel
+from torchtree_physher.physher.tree_transform_flags import RATIO
 
 
 def test_ctmc_scale():
@@ -9,6 +10,7 @@ def test_ctmc_scale():
         "((((A_0:1.5,B_1:0.5):2.5,C_2:2):2,D_3:3):10,E_12:4);",
         ['A_0', 'B_1', 'C_2', 'D_3', 'E_12'],
         [0.0, 1.0, 2.0, 3.0, 12.0],
+        RATIO,
     )
     ratios = convert(np.array([1.5, 4.0, 6.0, 16.0]), np.array([1.0, 2.0, 3.0, 12.0]))
     tree_model.set_parameters(ratios)
