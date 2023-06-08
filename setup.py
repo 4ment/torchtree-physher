@@ -1,8 +1,12 @@
+import os
 import sys
 
 import setuptools
 from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
+
+with open(os.path.join("torchtree_physher", "_version.py")) as f:
+    __version__ = f.readlines()[-1].split()[-1].strip("\"'")
 
 
 class get_pybind_include(object):
@@ -103,5 +107,6 @@ if __name__ == '__main__':
             ),
         ],
         'cmdclass': {'build_ext': BuildExt},
+        'version': __version__,
     }
     setup(**kwargs)

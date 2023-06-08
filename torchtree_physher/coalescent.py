@@ -6,6 +6,8 @@ import torchtree.evolution.coalescent
 from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.typing import ID
 
+import torchtree_physher.physher.gradient_flags as flags
+
 from .interface import Interface
 from .physher import ConstantCoalescentModel as PhysherConstantCoalescentModel
 from .physher import (
@@ -116,7 +118,16 @@ class CoalescentAutogradFunction(torch.autograd.Function):
         log_probs = []
         grads = []
         dim = reduce(operator.mul, thetas.shape[:-1], 1)
-        requires_grad = thetas.requires_grad and internal_heights.requires_grad
+        requires_grad = False
+
+        physher_flags = []
+        if thetas.requires_grad:
+            physher_flags.append(flags.THETA)
+        if internal_heights.requires_grad:
+            physher_flags.append(flags.TREE_HEIGHT)
+        if len(physher_flags) > 0:
+            inst.request_gradient(physher_flags)
+            requires_grad = True
 
         for i in range(dim):
             for model in models:

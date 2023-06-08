@@ -1,6 +1,7 @@
 # torchtree-physher
 
-[![Testing (Linux)](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml/badge.svg)](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml)
+[![Testing](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml/badge.svg)](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 torchtree-physher is a package providing fast gradient calculation implemented in [physher] for [torchtree]
 
@@ -74,6 +75,7 @@ Some types in the JSON configuration file have to be replaced in order to use th
   - `SimpleClockModel`
 - Site models:
   - `ConstantSiteModel`
+  - `GammaSiteModel`
   - `WeibullSiteModel`
 
 Note that the type of every sub-model of the tree likelihood object (e.g. site, tree models...) has to be replaced.
