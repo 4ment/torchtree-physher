@@ -1,3 +1,4 @@
+from torchtree_physher._version import __version__
 from torchtree_physher.branch_model import SimpleClockModel, StrictClockModel
 from torchtree_physher.coalescent import (
     ConstantCoalescentModel,
@@ -20,5 +21,35 @@ from torchtree_physher.substitution_model import (
 )
 from torchtree_physher.tree_likelihood import TreeLikelihoodModel
 from torchtree_physher.tree_model import ReparameterizedTimeTreeModel, UnRootedTreeModel
+
+__all__ = [
+    "__version__",
+    # clock models
+    "SimpleClockModel",
+    "StrictClockModel",
+    # coalescent models
+    "ConstantCoalescentModel",
+    "PiecewiseConstantCoalescentGridModel",
+    "PiecewiseConstantCoalescentModel",
+    "CTMCScale",
+    # data types
+    "GeneralDataType",
+    "NucleotideDataType",
+    # site models
+    "ConstantSiteModel",
+    "GammaSiteModel",
+    "InvariantSiteModel",
+    "WeibullSiteModel",
+    # substitution models
+    "GTR",
+    "HKY",
+    "JC69",
+    "GeneralNonSymmetricSubstitutionModel",
+    # tree likelihood model
+    "TreeLikelihoodModel",
+    # tree models
+    "ReparameterizedTimeTreeModel",
+    "UnRootedTreeModel",
+]
 
 __plugin__ = "cli.Physher"

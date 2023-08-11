@@ -1,3 +1,7 @@
+// Copyright 2021-2023 Mathieu Fourment.
+// torchtree-physher is free software under the GPLv3; see LICENSE file for
+// details.
+
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -89,7 +93,10 @@ PYBIND11_MODULE(physher, m) {
       .def("transform_jacobian",
            &ReparameterizedTimeTreeModelInterface::TransformJacobian);
 
-  py::class_<SubstitutionModelInterface>(m, "SubstitutionModelInterface");
+  py::class_<SubstitutionModelInterface>(m, "SubstitutionModelInterface")
+      .def("set_epsilon", [](SubstitutionModelInterface &self, double epsilon) {
+        return self.SetEpsilon(epsilon);
+      });
 
   py::class_<JC69Interface, SubstitutionModelInterface>(m, "JC69")
       .def(py::init<>())

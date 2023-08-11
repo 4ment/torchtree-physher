@@ -124,7 +124,7 @@ class CoalescentAutogradFunction(torch.autograd.Function):
         if thetas.requires_grad:
             physher_flags.append(flags.THETA)
         if internal_heights.requires_grad:
-            physher_flags.append(flags.TREE_HEIGHT)
+            physher_flags.append(flags.TREE_RATIO)
         if len(physher_flags) > 0:
             inst.request_gradient(physher_flags)
             requires_grad = True
