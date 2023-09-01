@@ -16,6 +16,9 @@ from .physher import (
 from .physher import (
     PiecewiseConstantCoalescentModel as PhysherPiecewiseConstantCoalescentModel,
 )
+from .physher import (
+    PiecewiseLinearCoalescentGridModel as PhysherPiecewiseLinearCoalescentGridModel,
+)
 from .physher import ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel
 from .utils import flatten_2D
 
@@ -42,6 +45,7 @@ class ConstantCoalescentModel(
         id_: ID,
         theta: AbstractParameter,
         tree_model,
+        **kwargs,
     ) -> None:
         super().__init__(id_, theta, tree_model)
         self.inst = PhysherConstantCoalescentModel(
@@ -90,6 +94,31 @@ class PiecewiseConstantCoalescentGridModel(
     ) -> None:
         super().__init__(id_, theta, grid, tree_model)
         self.inst = PhysherPiecewiseConstantCoalescentGridModel(
+            flatten_2D(theta.tensor)[0].tolist(),
+            tree_model.inst,
+            grid.tensor[-1].item(),
+        )
+
+    def _call(self, *args, **kwargs) -> torch.Tensor:
+        return evaluate_coalescent(self.inst, self, self.tree_model)
+
+    def update(self, index):
+        tensor_flatten = flatten_2D(self.theta.tensor)
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())
+
+
+class PiecewiseLinearCoalescentGridModel(
+    torchtree.evolution.coalescent.PiecewiseLinearCoalescentGridModel, Interface
+):
+    def __init__(
+        self,
+        id_: ID,
+        theta: AbstractParameter,
+        grid: AbstractParameter,
+        tree_model,
+    ) -> None:
+        super().__init__(id_, theta, grid, tree_model)
+        self.inst = PhysherPiecewiseLinearCoalescentGridModel(
             flatten_2D(theta.tensor)[0].tolist(),
             tree_model.inst,
             grid.tensor[-1].item(),

@@ -97,7 +97,7 @@ class GammaSiteModel(UnivariateDiscretizedSiteModel, Interface):
         return self._parameter.tensor
 
     def update(self, index) -> None:
-        self.inst.set_shape(flatten_2D(self.shape[index])[0].item())
+        self.inst.set_shape(flatten_2D(self.shape)[index].item())
         if self._mu is not None:
             self.inst.set_mu(flatten_2D(self._mu.tensor)[index].item())
         if self._invariant is not None:

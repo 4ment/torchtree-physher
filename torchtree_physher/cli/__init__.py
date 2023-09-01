@@ -67,6 +67,7 @@ class Physher(Plugin):
                     'ConstantCoalescentModel',
                     'PiecewiseConstantCoalescentGridModel',
                     'PiecewiseConstantCoalescentModel',
+                    'PiecewiseLinearCoalescentGridModel',
                 )
                 and arg.coalescent_temperature is None
             ):

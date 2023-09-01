@@ -4,6 +4,7 @@ from torchtree_physher.coalescent import (
     ConstantCoalescentModel,
     PiecewiseConstantCoalescentGridModel,
     PiecewiseConstantCoalescentModel,
+    PiecewiseLinearCoalescentGridModel,
 )
 from torchtree_physher.ctmc_scale import CTMCScale
 from torchtree_physher.data_type import GeneralDataType, NucleotideDataType
@@ -31,6 +32,7 @@ __all__ = [
     "ConstantCoalescentModel",
     "PiecewiseConstantCoalescentGridModel",
     "PiecewiseConstantCoalescentModel",
+    "PiecewiseLinearCoalescentGridModel",
     "CTMCScale",
     # data types
     "GeneralDataType",

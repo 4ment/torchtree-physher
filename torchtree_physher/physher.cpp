@@ -299,6 +299,10 @@ PYBIND11_MODULE(physher, m) {
                                        "PiecewiseConstantCoalescentGridModel")
       .def(py::init<const std::vector<double>, TreeModelInterface *, double>());
 
+  py::class_<PiecewiseLinearCoalescentGridInterface, CoalescentModelInterface>(
+      m, "PiecewiseLinearCoalescentGridModel")
+      .def(py::init<const std::vector<double>, TreeModelInterface *, double>());
+
   py::class_<CTMCScaleModelInterface>(m, "CTMCScaleModel")
       .def(py::init<const std::vector<double>, TreeModelInterface *>())
       .def("log_likelihood", &CTMCScaleModelInterface::LogLikelihood)
