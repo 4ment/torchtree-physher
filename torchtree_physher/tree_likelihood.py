@@ -284,7 +284,13 @@ class TreeLikelihoodFunction(torch.autograd.Function):
             log_probs.append(inst.log_likelihood())
             if len(physher_flags) > 0:
                 grads.append(inst.gradient())
-        ctx.grads = torch.tensor(np.stack(grads), **options) if len(grads) > 0 else None
+
+        ctx.grads = None
+        if len(grads) > 0:
+            ctx.grads = torch.tensor(np.stack(grads), **options)
+            if branch_lengths.dim() > 2:
+                ctx.grads = ctx.grads.view(branch_lengths.shape[:-1] + (-1,))
+
         log_probs = torch.tensor(log_probs, **options)
         if branch_lengths.dim() > 2:
             log_probs = log_probs.view(branch_lengths.shape[:-1] + (1,))
@@ -316,9 +322,9 @@ class TreeLikelihoodFunction(torch.autograd.Function):
 
         def extract_grad(param, offset):
             if param is not None and param.requires_grad:
-                param_grad = ctx.grads[
-                    ..., offset : offset + param.shape[-1]
-                ] * grad_output.unsqueeze(-1)
+                param_grad = (
+                    ctx.grads[..., offset : offset + param.shape[-1]] * grad_output
+                )
                 offset += param.shape[-1]
             else:
                 param_grad = None

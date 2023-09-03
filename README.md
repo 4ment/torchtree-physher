@@ -3,14 +3,35 @@
 [![Testing](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml/badge.svg)](https://github.com/4ment/torchtree-physher/actions/workflows/test_linux.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-torchtree-physher is a package providing fast gradient calculation implemented in [physher] for [torchtree]
+## About torchtree-physher
+torchtree-physher is a python package providing fast gradient calculation implemented in [physher] for [torchtree].
 
-## Dependencies
- - [torchtree]
+## Getting Started
+
+A C++ compiler such as ``g++`` or ``clang++`` is required.
+On Debian-based systems, this can be installed via ``apt``:
+
+```bash
+sudo apt install g++
+```
+
+On MacOS, it is recommended to use the latest version of ``clang++``:
+```bash
+brew install llvm
+```
+
+The [pybind11] library is also used for binding the
+C++ functionality to Python.
+
+### Dependencies
  - [physher]
+ - [pybind11]
+ - [PyTorch]
+ - [torchtree]
 
-## Installation
+[physher] is a phylogenetic program written in C that provides C++ wrappers to compute the tree and coalescent likelihoods and their gradients under different models.
 
+To build physher from source you can run
 ```bash
 git clone https://github.com/4ment/physher
 cmake -S . -B physher/build -DBUILD_CPP_WRAPPER=on -DBUILD_TESTING=on
@@ -22,22 +43,21 @@ Check it works (optional)
 ctest --test-dir physher/build/
 ```
 
-### Get the source code
+
+### Installation
+To build torchtree-physher from source you can run
 ```bash
 git clone https://github.com/4ment/torchtree-physher
-cd torchtree-physher
+pip install torchtree-physher/
 ```
 
-### Install using pip
-```bash
-pip install .
-```
-
-## Check install
+### Check install
 
 ```bash
 torchtree --help
 ```
+
+or
 
 ```bash
 python -c "import torchtree_physher"
@@ -67,6 +87,7 @@ Some types in the JSON configuration file have to be replaced in order to use th
   - `JC69`
   - `HKY`
   - `GTR`
+  - `GeneralNonSymmetricSubstitutionModel`
 - Tree models:
   - `UnRootedTreeModel`
   - `ReparameterizedTimeTreeModel`
@@ -76,6 +97,7 @@ Some types in the JSON configuration file have to be replaced in order to use th
 - Site models:
   - `ConstantSiteModel`
   - `GammaSiteModel`
+  - `InvariantSiteModel`
   - `WeibullSiteModel`
 
 Note that the type of every sub-model of the tree likelihood object (e.g. site, tree models...) has to be replaced.
@@ -99,6 +121,22 @@ Here is a list of coalescent models implemented in this plugin:
 - `ConstantCoalescentModel`
 - `PiecewiseConstantCoalescentGridModel` (aka skygrid)
 - `PiecewiseConstantCoalescentModel` (aka skyride)
+- `PiecewiseLinearCoalescentGridModel`
 
-[torchtree]: https://github.com/4ment/torchtree
+## License
+
+Distributed under the GPLv3 License. See [LICENSE](LICENSE) for more information.
+
+## Acknowledgements
+
+torchtree-physher makes use of the following libraries and tools, which are under their own respective licenses:
+
+ - [physher]
+ - [pybind11]
+ - [PyTorch]
+ - [torchtree]
+
 [physher]: https://github.com/4ment/physher
+[pybind11]: https://pybind11.readthedocs.io/en/stable
+[PyTorch]: https://pytorch.org
+[torchtree]: https://github.com/4ment/torchtree
