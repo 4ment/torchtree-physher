@@ -79,7 +79,7 @@ class PiecewiseConstantCoalescentModel(
 
     def update(self, index):
         tensor_flatten = flatten_2D(self.theta.tensor)
-        self.inst.set_parameters(tensor_flatten.detach().numpy())
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())
 
 
 class PiecewiseConstantCoalescentGridModel(
