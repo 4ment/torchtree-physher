@@ -12,9 +12,8 @@ from torchtree.evolution.tree_model import TreeModel
 from torchtree.typing import ID
 
 import torchtree_physher.physher.tree_likelihood_gradient_flags as flags
-
-from .physher import TreeLikelihoodModel as PhysherTreeLikelihood
-from .utils import flatten_2D
+from torchtree_physher.physher import TreeLikelihoodModel as PhysherTreeLikelihood
+from torchtree_physher.utils import flatten_2D
 
 
 class TreeLikelihoodModel(CallableModel):
@@ -79,7 +78,7 @@ class TreeLikelihoodModel(CallableModel):
 
         pinv = (
             self.site_model._invariant.tensor
-            if hasattr(self.site_model, '_invariant')
+            if hasattr(self.site_model, "_invariant")
             and self.site_model._invariant is not None
             else None
         )
@@ -98,11 +97,11 @@ class TreeLikelihoodModel(CallableModel):
         if isinstance(self.subst_model._frequencies, TransformedParameter):
             subst_frequencies = self.subst_model._frequencies.tensor
 
-        if hasattr(self.subst_model, '_rates') and isinstance(
+        if hasattr(self.subst_model, "_rates") and isinstance(
             self.subst_model._rates, TransformedParameter
         ):
             subst_rates = self.subst_model._rates.tensor
-        elif hasattr(self.subst_model, '_kappa') and isinstance(
+        elif hasattr(self.subst_model, "_kappa") and isinstance(
             self.subst_model._kappa, TransformedParameter
         ):
             subst_rates = self.subst_model.kappa
@@ -127,15 +126,15 @@ class TreeLikelihoodModel(CallableModel):
 
     @classmethod
     def from_json(cls, data, dic):
-        id_ = data['id']
+        id_ = data["id"]
         tree_model = process_object(data[TreeModel.tag], dic)
         site_model = process_object(data[SiteModel.tag], dic)
         subst_model = process_object(data[SubstitutionModel.tag], dic)
 
-        use_ambiguities = data.get('use_ambiguities', False)
-        use_tip_states = data.get('use_tip_states', False)
-        use_sse = data.get('use_sse', True)
-        include_jacobian = data.get('include_jacobian', False)
+        use_ambiguities = data.get("use_ambiguities", False)
+        use_tip_states = data.get("use_tip_states", False)
+        use_sse = data.get("use_sse", True)
+        include_jacobian = data.get("include_jacobian", False)
 
         clock_model = None
         if BranchModel.tag in data:
@@ -144,9 +143,9 @@ class TreeLikelihoodModel(CallableModel):
 
         # Ignore site_pattern and parse alignment instead
 
-        if data[SitePattern.tag]['type'] == 'torchtree_physher.AttributePattern':
-            taxa = process_object(data[SitePattern.tag]['taxa'], dic)
-            attribute_name = data[SitePattern.tag]['attribute']
+        if data[SitePattern.tag]["type"] == "torchtree_physher.AttributePattern":
+            taxa = process_object(data[SitePattern.tag]["taxa"], dic)
+            attribute_name = data[SitePattern.tag]["attribute"]
             taxon_list = [taxon.id for taxon in taxa]
             attribute_list = [taxon[attribute_name] for taxon in taxa]
 
@@ -163,22 +162,22 @@ class TreeLikelihoodModel(CallableModel):
             )
 
         # alignment is a reference to an object already parsed
-        elif isinstance(data[SitePattern.tag]['alignment'], str):
-            alignment = dic[data[SitePattern.tag]['alignment']]
+        elif isinstance(data[SitePattern.tag]["alignment"], str):
+            alignment = dic[data[SitePattern.tag]["alignment"]]
         # alignment contains a file entry
-        elif 'file' in data[SitePattern.tag]['alignment']:
-            alignment = read_fasta_sequences(data[SitePattern.tag]['alignment']['file'])
+        elif "file" in data[SitePattern.tag]["alignment"]:
+            alignment = read_fasta_sequences(data[SitePattern.tag]["alignment"]["file"])
         # alignment contains a dictionary of sequences
-        elif 'sequences' in data[SitePattern.tag]['alignment']:
-            alignment = Alignment.from_json(data[SitePattern.tag]['alignment'], dic)
+        elif "sequences" in data[SitePattern.tag]["alignment"]:
+            alignment = Alignment.from_json(data[SitePattern.tag]["alignment"], dic)
         else:
-            raise JSONParseError('site_pattern is misspecified')
+            raise JSONParseError("site_pattern is misspecified")
 
-        if 'indices' in data[SitePattern.tag]:
-            indices = data[SitePattern.tag]['indices']
+        if "indices" in data[SitePattern.tag]:
+            indices = data[SitePattern.tag]["indices"]
             if indices is not None:
                 list_of_indices = [
-                    string_to_list_index(index_str) for index_str in indices.split(',')
+                    string_to_list_index(index_str) for index_str in indices.split(",")
                 ]
                 sequences_new = [""] * len(alignment)
                 for index in list_of_indices:
@@ -270,7 +269,7 @@ class TreeLikelihoodFunction(torch.autograd.Function):
         elif clock_rates is None:
             rate_need_update = False
 
-        options = {'dtype': branch_lengths.dtype, 'device': branch_lengths.device}
+        options = {"dtype": branch_lengths.dtype, "device": branch_lengths.device}
 
         log_probs = []
         grads = []

@@ -21,7 +21,11 @@ from torchtree_physher.substitution_model import (
     GeneralNonSymmetricSubstitutionModel,
 )
 from torchtree_physher.tree_likelihood import TreeLikelihoodModel
-from torchtree_physher.tree_model import ReparameterizedTimeTreeModel, UnRootedTreeModel
+from torchtree_physher.tree_model import (
+    ReparameterizedTimeTreeModel,
+    TimeTreeModel,
+    UnRootedTreeModel,
+)
 
 __all__ = [
     "__version__",
@@ -51,6 +55,7 @@ __all__ = [
     "TreeLikelihoodModel",
     # tree models
     "ReparameterizedTimeTreeModel",
+    "TimeTreeModel",
     "UnRootedTreeModel",
 ]
 

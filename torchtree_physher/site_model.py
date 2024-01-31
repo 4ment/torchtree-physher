@@ -11,12 +11,12 @@ from torchtree.evolution.site_model import UnivariateDiscretizedSiteModel
 from torchtree.evolution.site_model import WeibullSiteModel as TorchtreeWeibullSiteModel
 from torchtree.typing import ID
 
-from .interface import Interface
-from .physher import ConstantSiteModel as PhysherConstantSiteModel
-from .physher import GammaSiteModel as PhysherGammaSiteModel
-from .physher import InvariantSiteModel as PhysherInvariantSiteModel
-from .physher import WeibullSiteModel as PhysherWeibullSiteModel
-from .utils import flatten_2D
+from torchtree_physher.interface import Interface
+from torchtree_physher.physher import ConstantSiteModel as PhysherConstantSiteModel
+from torchtree_physher.physher import GammaSiteModel as PhysherGammaSiteModel
+from torchtree_physher.physher import InvariantSiteModel as PhysherInvariantSiteModel
+from torchtree_physher.physher import WeibullSiteModel as PhysherWeibullSiteModel
+from torchtree_physher.utils import flatten_2D
 
 
 class ConstantSiteModel(TorchtreeConstantSiteModel, Interface):
@@ -112,14 +112,14 @@ class GammaSiteModel(UnivariateDiscretizedSiteModel, Interface):
 
     @classmethod
     def from_json(cls, data, dic):
-        id_ = data['id']
-        shape = process_object(data['shape'], dic)
-        categories = data['categories']
+        id_ = data["id"]
+        shape = process_object(data["shape"], dic)
+        categories = data["categories"]
         invariant = None
-        if 'invariant' in data:
-            invariant = process_object(data['invariant'], dic)
-        if 'mu' in data:
-            mu = process_object(data['mu'], dic)
+        if "invariant" in data:
+            invariant = process_object(data["invariant"], dic)
+        if "mu" in data:
+            mu = process_object(data["mu"], dic)
         else:
             mu = None
         return cls(id_, shape, categories, invariant, mu)

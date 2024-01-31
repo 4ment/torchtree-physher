@@ -5,15 +5,18 @@ from torchtree.evolution.taxa import Taxa
 from torchtree.evolution.tree_model import (
     ReparameterizedTimeTreeModel as TReparameterizedTimeTreeModel,
 )
+from torchtree.evolution.tree_model import TimeTreeModel as TTimeTreeModel
 from torchtree.evolution.tree_model import UnRootedTreeModel as TUnRootedTreeModel
 from torchtree.typing import ID
 
-import torchtree_physher.physher.tree_transform_flags as tree_transform_flags
-
-from .interface import Interface
-from .physher import ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel
-from .physher import UnRootedTreeModel as PhysherUnRootedTreeModel
-from .utils import flatten_2D
+from torchtree_physher.interface import Interface
+from torchtree_physher.physher import (
+    ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
+)
+from torchtree_physher.physher import TimeTreeModel as PhysherTimeTreeModel
+from torchtree_physher.physher import UnRootedTreeModel as PhysherUnRootedTreeModel
+from torchtree_physher.physher import tree_transform_flags
+from torchtree_physher.utils import flatten_2D
 
 
 class GeneralNodeHeightTransform(Transform):
@@ -48,7 +51,7 @@ class NodeHeightAutogradFunction(torch.autograd.Function):
         params_numpy = tensor_flatten.detach().numpy()
         for batch_idx in range(tensor_flatten.shape[0]):
             inst.set_parameters(params_numpy[batch_idx, ...])
-            node_heights.append(torch.tensor(inst.get_node_heights()))
+            node_heights.append(torch.tensor(inst.node_heights()))
 
         node_heights = torch.stack(node_heights)
         if ratios_root_height.shape != node_heights.shape:
@@ -113,7 +116,7 @@ class UnRootedTreeModel(TUnRootedTreeModel, Interface):
         super().__init__(id_, tree, taxa, branch_lengths)
         taxon_list = [taxon.id for taxon in taxa]
         self.inst = PhysherUnRootedTreeModel(
-            tree.as_string('newick').replace("'", "").replace('[&R] ', ''), taxon_list
+            tree.as_string("newick").replace("'", "").replace("[&R] ", ""), taxon_list
         )
 
     def update(self, index):
@@ -145,7 +148,7 @@ class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
         taxon_list = [taxon.id for taxon in taxa]
 
         self.inst = PhysherReparameterizedTimeTreeModel(
-            tree.as_string('newick').replace("'", "").replace('[&R] ', ''),
+            tree.as_string("newick").replace("'", "").replace("[&R] ", ""),
             taxon_list,
             self.sampling_times.tolist(),
             transform_flag,
@@ -187,3 +190,26 @@ class ReparameterizedTimeTreeModel(TReparameterizedTimeTreeModel, Interface):
             )
             self.heights_need_update = False
         return self._node_heights
+
+
+class TimeTreeModel(TTimeTreeModel, Interface):
+    def __init__(
+        self,
+        id_: ID,
+        tree,
+        taxa: Taxa,
+        internal_heights: AbstractParameter,
+    ) -> None:
+        super().__init__(id_, tree, taxa, internal_heights)
+        taxon_list = [taxon.id for taxon in taxa]
+
+        self.inst = PhysherTimeTreeModel(
+            tree.as_string("newick").replace("'", "").replace("[&R] ", ""),
+            taxon_list,
+            self.sampling_times.tolist(),
+        )
+        self.inst.set_parameters(internal_heights.tensor.tolist())
+
+    def update(self, index):
+        tensor_flatten = flatten_2D(self._internal_heights.tensor)
+        self.inst.set_parameters(tensor_flatten[index].detach().numpy())

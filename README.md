@@ -34,7 +34,7 @@ C++ functionality to Python.
 To build physher from source you can run
 ```bash
 git clone https://github.com/4ment/physher
-cmake -S . -B physher/build -DBUILD_CPP_WRAPPER=on -DBUILD_TESTING=on
+cmake -S physher/ -B physher/build -DBUILD_CPP_WRAPPER=on -DBUILD_TESTING=on
 cmake --build physher/build/ --target install
 ```
 
@@ -45,22 +45,16 @@ ctest --test-dir physher/build/
 
 
 ### Installation
-To build torchtree-physher from source you can run
+To build `torchtree-physher` from source you can run
 ```bash
 git clone https://github.com/4ment/torchtree-physher
 pip install torchtree-physher/
 ```
 
 ### Check install
-
+If the installation was successful, this command should print the version of the `torchtree_physher` library
 ```bash
-torchtree --help
-```
-
-or
-
-```bash
-python -c "import torchtree_physher"
+python -c "import torchtree_physher;print(torchtree_physher.__version__)"
 ```
 
 ## Command line arguments
@@ -74,6 +68,8 @@ torchtree-cli advi --help
                         include Jacobian of the node height transform in the node height gradient
   --physher_disable_sse
                         disable SSE in physher
+  --physher_disable_coalescent
+                        disable coalescent calculation by physher
   --physher_site {weibull,gamma}
                         distribution for rate heterogeneity across sites
 ```

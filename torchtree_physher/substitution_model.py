@@ -11,12 +11,14 @@ from torchtree.evolution.substitution_model.nucleotide import HKY as THKY
 from torchtree.evolution.substitution_model.nucleotide import JC69 as TJC69
 from torchtree.typing import ID
 
-from .interface import Interface
-from .physher import GTR as PhysherGTR
-from .physher import HKY as PhysherHKY
-from .physher import JC69 as PhysherJC69
-from .physher import GeneralSubstitutionModel as PhysherGeneralSubstitutionModel
-from .utils import flatten_2D
+from torchtree_physher.interface import Interface
+from torchtree_physher.physher import GTR as PhysherGTR
+from torchtree_physher.physher import HKY as PhysherHKY
+from torchtree_physher.physher import JC69 as PhysherJC69
+from torchtree_physher.physher import (
+    GeneralSubstitutionModel as PhysherGeneralSubstitutionModel,
+)
+from torchtree_physher.utils import flatten_2D
 
 
 class JC69(TJC69, Interface):
@@ -50,9 +52,9 @@ class HKY(THKY, Interface):
 
     @classmethod
     def from_json(cls, data, dic):
-        id_ = data['id']
-        rates = process_object(data['kappa'], dic)
-        frequencies = process_object(data['frequencies'], dic)
+        id_ = data["id"]
+        rates = process_object(data["kappa"], dic)
+        frequencies = process_object(data["frequencies"], dic)
         epsilon = data.get("epsilon", 0.00001)
         return cls(id_, rates, frequencies, epsilon)
 
@@ -83,9 +85,9 @@ class GTR(TGTR, Interface):
 
     @classmethod
     def from_json(cls, data, dic):
-        id_ = data['id']
-        rates = process_object(data['rates'], dic)
-        frequencies = process_object(data['frequencies'], dic)
+        id_ = data["id"]
+        rates = process_object(data["rates"], dic)
+        frequencies = process_object(data["frequencies"], dic)
         epsilon = data.get("epsilon", 0.0)
         return cls(id_, rates, frequencies, epsilon)
 
@@ -124,14 +126,14 @@ class GeneralNonSymmetricSubstitutionModel(
 
     @classmethod
     def from_json(cls, data, dic):
-        id_ = data['id']
-        data_type = process_object(data['data_type'], dic)
-        rates = process_object(data['rates'], dic)
-        frequencies = process_object(data['frequencies'], dic)
-        if isinstance(data['mapping'], list):
-            mapping = Parameter(None, torch.tensor(data['mapping']))
+        id_ = data["id"]
+        data_type = process_object(data["data_type"], dic)
+        rates = process_object(data["rates"], dic)
+        frequencies = process_object(data["frequencies"], dic)
+        if isinstance(data["mapping"], list):
+            mapping = Parameter(None, torch.tensor(data["mapping"]))
         else:
-            mapping = process_object(data['mapping'], dic)
-        normalize = data.get('normalize', True)
+            mapping = process_object(data["mapping"], dic)
+        normalize = data.get("normalize", True)
         epsilon = data.get("epsilon", 0.0)
         return cls(id_, data_type, mapping, rates, frequencies, normalize, epsilon)

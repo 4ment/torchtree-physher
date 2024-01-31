@@ -13,7 +13,7 @@ from torchtree_physher.physher.tree_transform_flags import RATIO
 
 def test_constant_coalescent():
     tree = ReparameterizedTimeTreeModel(
-        "(((A,B),C),D);", ['A', 'B', 'C', 'D'], [0.0, 0.0, 0.0, 0.0], RATIO
+        "(((A,B),C),D);", ["A", "B", "C", "D"], [0.0, 0.0, 0.0, 0.0], RATIO
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
     constant = ConstantCoalescentModel(3.0, tree)
@@ -26,7 +26,7 @@ def test_constant_coalescent():
 
 def test_skyride():
     tree = ReparameterizedTimeTreeModel(
-        "(((A,B),C),D);", ['A', 'B', 'C', 'D'], [0.0, 0.0, 0.0, 0.0], RATIO
+        "(((A,B),C),D);", ["A", "B", "C", "D"], [0.0, 0.0, 0.0, 0.0], RATIO
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
     skyride = PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
@@ -40,7 +40,7 @@ def test_skyride():
 
 def test_skyride_heterochronous():
     tree = ReparameterizedTimeTreeModel(
-        "((A,B),(C,D));", ['A', 'B', 'C', 'D'], [0.0, 1.0, 1.0, 0.0], RATIO
+        "((A,B),(C,D));", ["A", "B", "C", "D"], [0.0, 1.0, 1.0, 0.0], RATIO
     )
     tree.set_parameters(np.array([2 / 3, 1 / 3, 4.0]))  # heights: 3.0, 10.0, 4.0
     skyride = PiecewiseConstantCoalescentModel([3.0, 10.0, 4.0], tree)
@@ -54,7 +54,7 @@ def test_skyride_heterochronous():
 
 def test_skygrid():
     tree = ReparameterizedTimeTreeModel(
-        "(((A,B),C),D);", ['A', 'B', 'C', 'D'], [0.0, 0.0, 0.0, 0.0], RATIO
+        "(((A,B),C),D);", ["A", "B", "C", "D"], [0.0, 0.0, 0.0, 0.0], RATIO
     )
     tree.set_parameters(np.array([2.0 / 6.0, 6.0 / 12.0, 12.0]))
     skyrgrid = PiecewiseConstantCoalescentGridModel(
@@ -108,7 +108,7 @@ def test_skygrid():
 def test_skygrid_heterochronous(cutoff, expected, gradient):
     tree = ReparameterizedTimeTreeModel(
         "((((A,B),C),D),E);",
-        ['A', 'B', 'C', 'D', 'E'],
+        ["A", "B", "C", "D", "E"],
         [0.0, 1.0, 2.0, 3.0, 12.0],
         RATIO,
     )

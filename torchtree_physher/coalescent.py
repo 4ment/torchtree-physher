@@ -7,19 +7,23 @@ from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.typing import ID
 
 import torchtree_physher.physher.gradient_flags as flags
-
-from .interface import Interface
-from .physher import ConstantCoalescentModel as PhysherConstantCoalescentModel
-from .physher import (
+from torchtree_physher.interface import Interface
+from torchtree_physher.physher import (
+    ConstantCoalescentModel as PhysherConstantCoalescentModel,
+)
+from torchtree_physher.physher import (
     PiecewiseConstantCoalescentGridModel as PhysherPiecewiseConstantCoalescentGridModel,
 )
-from .physher import (
+from torchtree_physher.physher import (
     PiecewiseConstantCoalescentModel as PhysherPiecewiseConstantCoalescentModel,
 )
-from .physher import (
+from torchtree_physher.physher import (
     PiecewiseLinearCoalescentGridModel as PhysherPiecewiseLinearCoalescentGridModel,
 )
-from .physher import ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel
+from torchtree_physher.physher import (
+    ReparameterizedTimeTreeModel as PhysherReparameterizedTimeTreeModel,
+)
+
 from .utils import flatten_2D
 
 

@@ -4,9 +4,8 @@ from torchtree.core.abstractparameter import AbstractParameter
 from torchtree.typing import ID
 
 import torchtree_physher.physher.gradient_flags as flags
-
-from .interface import Interface
-from .physher import CTMCScaleModel as PhysherCTMCScaleModel
+from torchtree_physher.interface import Interface
+from torchtree_physher.physher import CTMCScaleModel as PhysherCTMCScaleModel
 
 
 class CTMCScale(torchtree.distributions.ctmc_scale.CTMCScale, Interface):

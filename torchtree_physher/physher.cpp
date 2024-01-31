@@ -16,7 +16,28 @@ using double_np =
     py::array_t<double, pybind11::array::c_style | pybind11::array::forcecast>;
 
 PYBIND11_MODULE(physher, m) {
-  py::class_<TreeLikelihoodInterface>(m, "TreeLikelihoodModel")
+  py::class_<ModelInterface>(m, "ModelInterface")
+      .def("set_parameters",
+           [](ModelInterface &self, double_np parameters) {
+             self.SetParameters(parameters.data());
+           })
+      .def("parameters", [](ModelInterface &self) {
+        double_np parameters = double_np(self.parameterCount_);
+        self.GetParameters(parameters.mutable_data());
+        return parameters;
+      });
+
+  py::class_<CallableModelInterface, ModelInterface>(m,
+                                                     "CallableModelInterface")
+      .def("log_likelihood", &CallableModelInterface::LogLikelihood)
+      .def("gradient", [](CallableModelInterface &self) {
+        double_np gradient = double_np(self.gradientLength_);
+        self.Gradient(gradient.mutable_data());
+        return gradient;
+      });
+
+  py::class_<TreeLikelihoodInterface, CallableModelInterface>(
+      m, "TreeLikelihoodModel")
       .def(py::init<const std::vector<std::pair<std::string, std::string>> &,
                     TreeModelInterface *, SubstitutionModelInterface *,
                     SiteModelInterface *, std::optional<BranchModelInterface *>,
@@ -25,49 +46,28 @@ PYBIND11_MODULE(physher, m) {
                     const std::vector<std::string> &, TreeModelInterface *,
                     SubstitutionModelInterface *, SiteModelInterface *,
                     std::optional<BranchModelInterface *>, bool, bool, bool>())
-      .def("log_likelihood", &TreeLikelihoodInterface::LogLikelihood)
-      .def("gradient",
-           [](TreeLikelihoodInterface &self) {
-             double_np gradient = double_np(self.gradientLength_);
-             self.Gradient(gradient.mutable_data());
-             return gradient;
-           })
       .def("request_gradient", &TreeLikelihoodInterface::RequestGradient)
       .def("enable_sse", &TreeLikelihoodInterface::EnableSSE);
 
-  py::class_<TreeModelInterface>(m, "TreeModelInterface");
+  py::class_<TreeModelInterface, ModelInterface>(m, "TreeModelInterface");
+
   py::class_<UnRootedTreeModelInterface, TreeModelInterface>(
       m, "UnRootedTreeModel")
-      .def(py::init<const std::string &, const std::vector<std::string> &>())
-      .def("set_parameters",
-           [](UnRootedTreeModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](UnRootedTreeModelInterface &self) {
+      .def(py::init<const std::string &, const std::vector<std::string> &>());
+
+  py::class_<TimeTreeModelInterface, TreeModelInterface>(m, "TimeTreeModel")
+      .def(py::init<const std::string &, const std::vector<std::string> &,
+                    const std::vector<double>>())
+      .def("node_heights", [](TimeTreeModelInterface &self) {
         double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
+        self.GetNodeHeights(parameters.mutable_data());
         return parameters;
       });
 
-  py::class_<ReparameterizedTimeTreeModelInterface, TreeModelInterface>(
+  py::class_<ReparameterizedTimeTreeModelInterface, TimeTreeModelInterface>(
       m, "ReparameterizedTimeTreeModel")
       .def(py::init<const std::string &, const std::vector<std::string> &,
                     const std::vector<double>, TreeTransformFlags>())
-      .def("set_parameters",
-           [](ReparameterizedTimeTreeModelInterface &self,
-              double_np parameters) { self.SetParameters(parameters.data()); })
-      .def("parameters",
-           [](ReparameterizedTimeTreeModelInterface &self) {
-             double_np parameters = double_np(self.parameterCount_);
-             self.GetParameters(parameters.mutable_data());
-             return parameters;
-           })
-      .def("get_node_heights",
-           [](ReparameterizedTimeTreeModelInterface &self) {
-             double_np parameters = double_np(self.parameterCount_);
-             self.GetNodeHeights(parameters.mutable_data());
-             return parameters;
-           })
       .def("gradient_transform_jvp",
            [](ReparameterizedTimeTreeModelInterface &self,
               double_np height_gradient) {
@@ -93,16 +93,19 @@ PYBIND11_MODULE(physher, m) {
       .def("transform_jacobian",
            &ReparameterizedTimeTreeModelInterface::TransformJacobian);
 
-  py::class_<SubstitutionModelInterface>(m, "SubstitutionModelInterface")
+  py::class_<SubstitutionModelInterface, ModelInterface>(
+      m, "SubstitutionModelInterface")
       .def("set_epsilon", [](SubstitutionModelInterface &self, double epsilon) {
-        return self.SetEpsilon(epsilon);
+        self.SetEpsilon(epsilon);
       });
 
   py::class_<JC69Interface, SubstitutionModelInterface>(m, "JC69")
       .def(py::init<>())
       .def("set_parameters",
            [](JC69Interface &self, double_np parameters) {
-             return self.SetParameters(parameters.data());
+             throw std::runtime_error(
+                 "set_parameters should not be used on a JC69 substitution "
+                 "model");
            })
       .def("parameters", [](JC69Interface &self) {
         double_np empty;
@@ -112,38 +115,18 @@ PYBIND11_MODULE(physher, m) {
   py::class_<HKYInterface, SubstitutionModelInterface>(m, "HKY")
       .def(py::init<double, const std::vector<double> &>())
       .def("set_kappa", &HKYInterface::SetKappa)
-      .def("set_frequencies",
-           [](HKYInterface &self, double_np parameters) {
-             return self.SetFrequencies(parameters.data());
-           })
-      .def("set_parameters",
-           [](HKYInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](HKYInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
+      .def("set_frequencies", [](HKYInterface &self, double_np parameters) {
+        self.SetFrequencies(parameters.data());
       });
 
   py::class_<GTRInterface, SubstitutionModelInterface>(m, "GTR")
       .def(py::init<const std::vector<double> &, const std::vector<double> &>())
       .def("set_rates",
            [](GTRInterface &self, double_np parameters) {
-             return self.SetRates(parameters.data());
+             self.SetRates(parameters.data());
            })
-      .def("set_frequencies",
-           [](GTRInterface &self, double_np parameters) {
-             return self.SetFrequencies(parameters.data());
-           })
-      .def("set_parameters",
-           [](GTRInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](GTRInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
+      .def("set_frequencies", [](GTRInterface &self, double_np parameters) {
+        self.SetFrequencies(parameters.data());
       });
 
   py::class_<GeneralSubstitutionModelInterface, SubstitutionModelInterface>(
@@ -153,21 +136,12 @@ PYBIND11_MODULE(physher, m) {
                     bool>())
       .def("set_rates",
            [](GeneralSubstitutionModelInterface &self, double_np parameters) {
-             return self.SetRates(parameters.data());
+             self.SetRates(parameters.data());
            })
       .def("set_frequencies",
            [](GeneralSubstitutionModelInterface &self, double_np parameters) {
-             return self.SetFrequencies(parameters.data());
-           })
-      .def("set_parameters",
-           [](GeneralSubstitutionModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](GeneralSubstitutionModelInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
-      });
+             self.SetFrequencies(parameters.data());
+           });
 
   py::class_<DataTypeInterface>(m, "DataTypeInterface");
   py::class_<GeneralDataTypeInterface, DataTypeInterface>(m, "GeneralDataType")
@@ -178,8 +152,9 @@ PYBIND11_MODULE(physher, m) {
       m, "NucleotideDataType")
       .def(py::init<>());
 
-  py::class_<SiteModelInterface>(m, "SiteModelInterface")
+  py::class_<SiteModelInterface, ModelInterface>(m, "SiteModelInterface")
       .def("set_mu", &ConstantSiteModelInterface::SetMu);
+
   py::class_<ConstantSiteModelInterface, SiteModelInterface>(
       m, "ConstantSiteModel")
       .def(py::init<std::optional<double>>())
@@ -202,29 +177,22 @@ PYBIND11_MODULE(physher, m) {
       m, "InvariantSiteModel")
       .def(py::init<double, std::optional<double>>())
       .def("set_proportion_invariant",
-           &InvariantSiteModelInterface::SetProportionInvariant)
-      .def("set_parameters",
-           [](InvariantSiteModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](InvariantSiteModelInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
-      });
+           &InvariantSiteModelInterface::SetProportionInvariant);
 
   py::class_<DiscretizedSiteModelInterface, SiteModelInterface>(
       m, "DiscretizedConstantSiteModel")
       .def("set_proportion_invariant",
            &DiscretizedSiteModelInterface::SetProportionInvariant)
-      .def("set_parameters",
-           [](DiscretizedSiteModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
+      .def("rates",
+           [](DiscretizedSiteModelInterface &self) {
+             double_np rates = double_np(self.GetCategoryCount());
+             self.GetParameters(rates.mutable_data());
+             return rates;
            })
-      .def("parameters", [](DiscretizedSiteModelInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
+      .def("proportions", [](DiscretizedSiteModelInterface &self) {
+        double_np proportions = double_np(self.GetCategoryCount());
+        self.GetParameters(proportions.mutable_data());
+        return proportions;
       });
 
   py::class_<WeibullSiteModelInterface, DiscretizedSiteModelInterface>(
@@ -240,51 +208,24 @@ PYBIND11_MODULE(physher, m) {
       .def("set_shape", &GammaSiteModelInterface::SetShape)
       .def("set_epsilon", &GammaSiteModelInterface::SetEpsilon);
 
-  py::class_<BranchModelInterface>(m, "BranchModelInterface")
-      .def("parameters", [](BranchModelInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
-      });
+  py::class_<BranchModelInterface, ModelInterface>(m, "BranchModelInterface");
+
   py::class_<StrictClockModelInterface, BranchModelInterface>(
       m, "StrictClockModel")
       .def(py::init<double, TreeModelInterface *>())
-      .def("set_parameters",
-           [](StrictClockModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
       .def("set_rate", &StrictClockModelInterface::SetRate);
 
   py::class_<SimpleClockModelInterface, BranchModelInterface>(
       m, "SimpleClockModel")
       .def(py::init<const std::vector<double> &, TreeModelInterface *>())
-      .def("set_parameters",
-           [](SimpleClockModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
       .def("set_rates",
            [](SimpleClockModelInterface &self, double_np parameters) {
-             return self.SetRates(parameters.data());
+             self.SetRates(parameters.data());
            });
 
-  py::class_<CoalescentModelInterface>(m, "CoalescentModelInterface")
-      .def("log_likelihood", &CoalescentModelInterface::LogLikelihood)
-      .def("gradient",
-           [](CoalescentModelInterface &self) {
-             double_np parameters = double_np(self.gradientLength_);
-             self.Gradient(parameters.mutable_data());
-             return parameters;
-           })
-      .def("request_gradient", &CoalescentModelInterface::RequestGradient)
-      .def("set_parameters",
-           [](CoalescentModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](CoalescentModelInterface &self) {
-        double_np parameters = double_np(self.parameterCount_);
-        self.GetParameters(parameters.mutable_data());
-        return parameters;
-      });
+  py::class_<CoalescentModelInterface, CallableModelInterface>(
+      m, "CoalescentModelInterface")
+      .def("request_gradient", &CoalescentModelInterface::RequestGradient);
 
   py::class_<ConstantCoalescentModelInterface, CoalescentModelInterface>(
       m, "ConstantCoalescentModel")
@@ -303,24 +244,10 @@ PYBIND11_MODULE(physher, m) {
       m, "PiecewiseLinearCoalescentGridModel")
       .def(py::init<const std::vector<double>, TreeModelInterface *, double>());
 
-  py::class_<CTMCScaleModelInterface>(m, "CTMCScaleModel")
+  py::class_<CTMCScaleModelInterface, CallableModelInterface>(m,
+                                                              "CTMCScaleModel")
       .def(py::init<const std::vector<double>, TreeModelInterface *>())
-      .def("log_likelihood", &CTMCScaleModelInterface::LogLikelihood)
-      .def("gradient",
-           [](CTMCScaleModelInterface &self) {
-             double_np gradient = double_np(self.gradientLength_);
-             self.Gradient(gradient.mutable_data());
-             return gradient;
-           })
-      .def("request_gradient", &CTMCScaleModelInterface::RequestGradient)
-      .def("set_parameters",
-           [](CTMCScaleModelInterface &self, double_np parameters) {
-             self.SetParameters(parameters.data());
-           })
-      .def("parameters", [](CTMCScaleModelInterface &self) {
-        double_np empty;
-        return empty;
-      });
+      .def("request_gradient", &CTMCScaleModelInterface::RequestGradient);
 
   py::module gradient_flags = m.def_submodule("gradient_flags");
   py::enum_<GradientFlags>(gradient_flags, "coalescent_gradient_flags")

@@ -3,10 +3,10 @@ from torchtree.evolution.branch_model import SimpleClockModel as TSimpleClockMod
 from torchtree.evolution.branch_model import StrictClockModel as TStrictClockModel
 from torchtree.typing import ID
 
-from .interface import Interface
-from .physher import SimpleClockModel as PhysherSimpleClockModel
-from .physher import StrictClockModel as PhysherStrictClockModel
-from .utils import flatten_2D
+from torchtree_physher.interface import Interface
+from torchtree_physher.physher import SimpleClockModel as PhysherSimpleClockModel
+from torchtree_physher.physher import StrictClockModel as PhysherStrictClockModel
+from torchtree_physher.utils import flatten_2D
 
 
 class StrictClockModel(TStrictClockModel, Interface):

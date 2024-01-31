@@ -4,8 +4,8 @@ from torchtree.evolution.datatype import GeneralDataType as TGeneralDataType
 from torchtree.evolution.datatype import NucleotideDataType as TNucleotideDataType
 from torchtree.typing import ID
 
-from .physher import GeneralDataType as PhysherGeneralDataType
-from .physher import NucleotideDataType as PhysherNucleotideDataType
+from torchtree_physher.physher import GeneralDataType as PhysherGeneralDataType
+from torchtree_physher.physher import NucleotideDataType as PhysherNucleotideDataType
 
 
 class NucleotideDataType(TNucleotideDataType):

@@ -25,10 +25,10 @@ from torchtree_physher.physher import (
         "(D:0.04,(C:0.03,(B:0.02,A:0.01):0.5):0.0);",
     ],
 )
-@pytest.mark.parametrize('use_tip_states', [True, False])
+@pytest.mark.parametrize("use_tip_states", [True, False])
 def test_unrooted(newick, use_tip_states):
-    taxon_list = ['A', 'B', 'C', 'D']
-    sequence_list = [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT'), ('D', 'GCGT')]
+    taxon_list = ["A", "B", "C", "D"]
+    sequence_list = [("A", "ACTG"), ("B", "ACGT"), ("C", "ACGT"), ("D", "GCGT")]
     m = ConstantSiteModel(None)
     sm = JC69()
     tree = UnRootedTreeModel(newick, taxon_list)
@@ -49,7 +49,7 @@ def test_unrooted(newick, use_tip_states):
     pm = torchtree_physher.ConstantSiteModel(None)
     psm = torchtree_physher.JC69(None)
     taxa = Taxa(None, [Taxon(taxon, {}) for taxon in taxon_list])
-    tree = parse_tree(taxa, {'newick': newick})
+    tree = parse_tree(taxa, {"newick": newick})
     blens = Parameter(None, torch.tensor(branch_lengths))
     ptree = torchtree_physher.UnRootedTreeModel(None, tree, taxa, blens)
     sequences = [Sequence(taxon, seq) for taxon, seq in sequence_list]
@@ -61,10 +61,10 @@ def test_unrooted(newick, use_tip_states):
 def test_unrooted_weibull():
     m = WeibullSiteModel(0.1, 4, None, None)
     sm = JC69()
-    tree = UnRootedTreeModel("(A:0.1,(B:0.1,C:0.2):0.1);", ['A', 'B', 'C'])
+    tree = UnRootedTreeModel("(A:0.1,(B:0.1,C:0.2):0.1);", ["A", "B", "C"])
     use_ambiguities = True
     tlk = TreeLikelihoodModel(
-        [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT')],
+        [("A", "ACTG"), ("B", "ACGT"), ("C", "ACGT")],
         tree,
         sm,
         m,
@@ -80,25 +80,25 @@ def test_unrooted_weibull():
 
 
 def test_unrooted_weibull2():
-    shape = Parameter('shape', torch.tensor([0.1]))
-    m = torchtree_physher.WeibullSiteModel('weibull', shape, 4)
-    sm = torchtree_physher.JC69('jc')
+    shape = Parameter("shape", torch.tensor([0.1]))
+    m = torchtree_physher.WeibullSiteModel("weibull", shape, 4)
+    sm = torchtree_physher.JC69("jc")
     tree_model_json = torchtree_physher.UnRootedTreeModel.json_factory(
-        'tree',
-        '(A:0.2,(B:0.1,C:0.2):0.0);',
+        "tree",
+        "(A:0.2,(B:0.1,C:0.2):0.0);",
         [0.2, 0.1, 0.2],
-        {'A': '', 'B': '', 'C': ''},
-        **{'keep_branch_lengths': True}
+        {"A": "", "B": "", "C": ""},
+        **{"keep_branch_lengths": True}
     )
     print(tree_model_json)
-    tree_model_json['type'] = 'torchtree_physher.' + tree_model_json['type']
+    tree_model_json["type"] = "torchtree_physher." + tree_model_json["type"]
     tree_model = torchtree_physher.UnRootedTreeModel.from_json(
         tree_model_json,
         {},
     )
     tlk = torchtree_physher.TreeLikelihoodModel(
-        'id',
-        [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT')],
+        "id",
+        [("A", "ACTG"), ("B", "ACGT"), ("C", "ACGT")],
         tree_model,
         sm,
         m,
@@ -133,10 +133,10 @@ def test_unrooted_weibull2():
         "(D:0.04,(C:0.03,(B:0.02,A:0.01):0.5):0.0);",
     ],
 )
-@pytest.mark.parametrize('use_tip_states', [True, False])
+@pytest.mark.parametrize("use_tip_states", [True, False])
 def test_unrooted_GTR(newick, use_tip_states):
-    taxon_list = ['A', 'B', 'C', 'D']
-    sequence_list = [('A', 'ACTG'), ('B', 'ACGT'), ('C', 'ACGT'), ('D', 'GCGT')]
+    taxon_list = ["A", "B", "C", "D"]
+    sequence_list = [("A", "ACTG"), ("B", "ACGT"), ("C", "ACGT"), ("D", "GCGT")]
     m = ConstantSiteModel(None)
     sm = GTR([1.0 / 6] * 6, [0.25] * 4)
     tree = UnRootedTreeModel(newick, taxon_list)
@@ -157,11 +157,11 @@ def test_unrooted_GTR(newick, use_tip_states):
     pm = torchtree_physher.ConstantSiteModel(None)
     psm = torchtree_physher.GTR(
         None,
-        Parameter('rates', torch.full([6], 1.0 / 6)),
-        Parameter('freqs', torch.full([4], 0.25)),
+        Parameter("rates", torch.full([6], 1.0 / 6)),
+        Parameter("freqs", torch.full([4], 0.25)),
     )
     taxa = Taxa(None, [Taxon(taxon, {}) for taxon in taxon_list])
-    tree = parse_tree(taxa, {'newick': newick})
+    tree = parse_tree(taxa, {"newick": newick})
     blens = Parameter(None, torch.tensor(branch_lengths))
     ptree = torchtree_physher.UnRootedTreeModel(None, tree, taxa, blens)
     sequences = [Sequence(taxon, seq) for taxon, seq in sequence_list]
