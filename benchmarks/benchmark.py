@@ -204,18 +204,18 @@ def ratio_transform_jacobian(args):
     tree_model()
 
     @benchmark
-    def fn(internal_heights):
+    def fn():
         return torch.tensor([tree_model.inst.transform_jacobian()])
 
     @benchmark
-    def fn_grad(internal_heights):
+    def fn_grad():
         return torch.tensor(tree_model.inst.gradient_transform_jacobian())
 
-    total_time, log_det_jac = fn(args.replicates, internal_heights)
+    total_time, log_det_jac = fn(args.replicates)
     print(f"  {args.replicates} evaluations: {total_time} ({log_det_jac})")
 
     internal_heights.requires_grad = True
-    grad_total_time, grad_log_det_jac = fn_grad(args.replicates, internal_heights)
+    grad_total_time, grad_log_det_jac = fn_grad(args.replicates)
     print(f"  {args.replicates} gradient evaluations: {grad_total_time}")
 
     if args.output:

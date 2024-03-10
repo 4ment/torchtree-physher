@@ -229,20 +229,20 @@ PYBIND11_MODULE(physher, m) {
 
   py::class_<ConstantCoalescentModelInterface, CoalescentModelInterface>(
       m, "ConstantCoalescentModel")
-      .def(py::init<double, TreeModelInterface *>());
+      .def(py::init<double, TimeTreeModelInterface *>());
 
   py::class_<PiecewiseConstantCoalescentInterface, CoalescentModelInterface>(
       m, "PiecewiseConstantCoalescentModel")
-      .def(py::init<const std::vector<double>, TreeModelInterface *>());
+      .def(py::init<const std::vector<double>, TimeTreeModelInterface *>());
 
   py::class_<PiecewiseConstantCoalescentGridInterface,
              CoalescentModelInterface>(m,
                                        "PiecewiseConstantCoalescentGridModel")
-      .def(py::init<const std::vector<double>, TreeModelInterface *, double>());
+      .def(py::init<const std::vector<double>, TimeTreeModelInterface *, double>());
 
   py::class_<PiecewiseLinearCoalescentGridInterface, CoalescentModelInterface>(
       m, "PiecewiseLinearCoalescentGridModel")
-      .def(py::init<const std::vector<double>, TreeModelInterface *, double>());
+      .def(py::init<const std::vector<double>, TimeTreeModelInterface *, double>());
 
   py::class_<CTMCScaleModelInterface, CallableModelInterface>(m,
                                                               "CTMCScaleModel")
