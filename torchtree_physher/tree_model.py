@@ -90,19 +90,28 @@ class NodeHeightJacobianAutogradFunction(torch.autograd.Function):
 
         log_probs = []
         grads = []
+        options = {
+            "dtype": ratios_root_height.dtype,
+            "device": ratios_root_height.device,
+        }
 
         tensor_flatten = flatten_2D(ratios_root_height)
         params_numpy = tensor_flatten.detach().numpy()
         for batch_idx in range(tensor_flatten.shape[0]):
             inst.set_parameters(params_numpy[batch_idx, ...])
-            log_probs.append(torch.tensor([inst.transform_jacobian()]))
+            log_probs.append(inst.transform_jacobian())
             if ratios_root_height.requires_grad:
-                grads.append(torch.tensor(inst.gradient_transform_jacobian()))
-        log_probs = torch.concat(log_probs, -1)
-        if ratios_root_height.dim() > 2:
-            log_probs = log_probs.view(ratios_root_height.shape[:-1] + (1,))
-        ctx.grads = torch.stack(grads) if ratios_root_height.requires_grad else None
-        return log_probs
+                grads.append(
+                    torch.tensor(inst.gradient_transform_jacobian(), **options)
+                )
+
+        ctx.grads = None
+        if ratios_root_height.requires_grad:
+            ctx.grads = torch.stack(grads).view(ratios_root_height.shape)
+
+        return torch.tensor(log_probs, **options).view(
+            ratios_root_height.shape[:-1] + (1,)
+        )
 
     @staticmethod
     def backward(ctx, grad_output):

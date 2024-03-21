@@ -150,6 +150,7 @@ class CoalescentAutogradFunction(torch.autograd.Function):
 
         log_probs = []
         grads = []
+        options = {"dtype": internal_heights.dtype, "device": internal_heights.device}
         dim = reduce(operator.mul, thetas.shape[:-1], 1)
         requires_grad = False
 
@@ -165,11 +166,11 @@ class CoalescentAutogradFunction(torch.autograd.Function):
         for i in range(dim):
             for model in models:
                 model.update(i)
-            log_probs.append(torch.tensor([inst.log_likelihood()]))
+            log_probs.append(inst.log_likelihood())
             if requires_grad:
-                grads.append(torch.tensor(inst.gradient()))
+                grads.append(torch.tensor(inst.gradient(), **options))
         ctx.grads = torch.stack(grads) if len(grads) > 0 else None
-        return torch.concat(log_probs, -1).view(thetas.shape[:-1] + (1,))
+        return torch.tensor(log_probs, **options).view(thetas.shape[:-1] + (1,))
 
     @staticmethod
     def backward(ctx, grad_output):

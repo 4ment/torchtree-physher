@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from torchtree import TransformedParameter
 from torchtree.core.model import CallableModel
@@ -282,18 +281,13 @@ class TreeLikelihoodFunction(torch.autograd.Function):
 
             log_probs.append(inst.log_likelihood())
             if len(physher_flags) > 0:
-                grads.append(inst.gradient())
+                grads.append(torch.tensor(inst.gradient(), **options))
 
         ctx.grads = None
         if len(grads) > 0:
-            ctx.grads = torch.tensor(np.stack(grads), **options)
-            if branch_lengths.dim() > 2:
-                ctx.grads = ctx.grads.view(branch_lengths.shape[:-1] + (-1,))
+            ctx.grads = torch.stack(grads).view(branch_lengths.shape[:-1] + (-1,))
 
-        log_probs = torch.tensor(log_probs, **options)
-        if branch_lengths.dim() > 2:
-            log_probs = log_probs.view(branch_lengths.shape[:-1] + (1,))
-        return log_probs
+        return torch.tensor(log_probs, **options).view(branch_lengths.shape[:-1] + (1,))
 
     @staticmethod
     def backward(ctx, grad_output) -> torch.Tensor:
