@@ -2,14 +2,14 @@
 // torchtree-physher is free software under the GPLv3; see LICENSE file for
 // details.
 
+#include "phycpp/physher.hpp"
+
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include <optional>
 #include <string>
-
-#include "phycpp/physher.hpp"
 namespace py = pybind11;
 
 using double_np =
@@ -238,11 +238,13 @@ PYBIND11_MODULE(physher, m) {
   py::class_<PiecewiseConstantCoalescentGridInterface,
              CoalescentModelInterface>(m,
                                        "PiecewiseConstantCoalescentGridModel")
-      .def(py::init<const std::vector<double>, TimeTreeModelInterface *, double>());
+      .def(py::init<const std::vector<double>, TimeTreeModelInterface *,
+                    double>());
 
   py::class_<PiecewiseLinearCoalescentGridInterface, CoalescentModelInterface>(
       m, "PiecewiseLinearCoalescentGridModel")
-      .def(py::init<const std::vector<double>, TimeTreeModelInterface *, double>());
+      .def(py::init<const std::vector<double>, TimeTreeModelInterface *,
+                    double>());
 
   py::class_<CTMCScaleModelInterface, CallableModelInterface>(m,
                                                               "CTMCScaleModel")
@@ -282,6 +284,8 @@ PYBIND11_MODULE(physher, m) {
 
   py::module tree_transform_flags = m.def_submodule("tree_transform_flags");
   py::enum_<TreeTransformFlags>(tree_transform_flags, "tree_transform_flags")
+      .value("PROPORTION", TreeTransformFlags::PROPORTION,
+             "tree transform using proportion parameterization")
       .value("RATIO", TreeTransformFlags::RATIO,
              "tree transform using ratio parameterization")
       .value("SHIFT", TreeTransformFlags::SHIFT,

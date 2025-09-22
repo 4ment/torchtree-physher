@@ -117,7 +117,7 @@ Here is a list of coalescent models implemented in this plugin:
 - `ConstantCoalescentModel`
 - `PiecewiseConstantCoalescentGridModel` (aka skygrid)
 - `PiecewiseConstantCoalescentModel` (aka skyride)
-- `PiecewiseLinearCoalescentGridModel`
+- `PiecewiseLinearCoalescentGridModel` (aka skyglide)
 
 ## License
 
